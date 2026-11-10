@@ -4706,7 +4706,8 @@ export default {
       update(dt, time, camera, u) {
         tU.value = time;
         sky.update(dt, time, camera); ocean.update(dt, time, camera); bank.update(dt, time, camera);
-        _fr.setFromProjectionMatrix(_pv.copy(camera.matrixWorld).invert().premultiply(camera.projectionMatrix)); seenNow.on = true;
+        const visibilityCamera = camera.viewCamera || camera;
+        _fr.setFromProjectionMatrix(_pv.copy(visibilityCamera.matrixWorld).invert().premultiply(visibilityCamera.projectionMatrix)); seenNow.on = true;
         seenNow.front = false; for (let i = 0; i < frontBoxes.length; i++) if (_fr.intersectsBox(frontBoxes[i])) { seenNow.front = true; break; }
         placeShips(time); placeWakes(time); placeCrowd(time, false); wakeMesh.visible = seenNow.war;
         _at.setFromMatrixPosition(camera.matrixWorld);

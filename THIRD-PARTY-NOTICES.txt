@@ -11,6 +11,11 @@ copyright line below; the licence text that follows them applies to each.
    The 3D library the whole site is drawn with.
    https://github.com/mrdoob/three.js
 
+   Local WebXR fix: backported r172's enabledFeatures.includes('layers') check
+   to the r170 WebXRManager. Projection layers are used only when the session
+   enabled them; other sessions use XRWebGLLayer.
+   https://github.com/mrdoob/three.js/blob/r172/src/renderers/webxr/WebXRManager.js
+
    Copyright © 2010-2024 three.js authors
 
    One world's own file (the plan of the otter airliner) measures the

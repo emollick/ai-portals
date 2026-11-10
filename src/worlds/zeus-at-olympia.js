@@ -1962,7 +1962,8 @@ export default {
       return b;
     };
     updates.push((dt, time, camera) => {
-      frustum.setFromProjectionMatrix(PV.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+      const visibilityCamera = camera.viewCamera || camera;
+      frustum.setFromProjectionMatrix(PV.multiplyMatrices(visibilityCamera.projectionMatrix, visibilityCamera.matrixWorldInverse));
       for (const q of cullParts) { const seen = frustum.intersectsBox(q.box); if (seen !== q.shown) { q.shown = seen; q.mesh.visible = seen; } }
     });
     const add = (geo, mat, o = {}) => { const m = new THREE.Mesh(geo, mat); m.castShadow = !!o.cast; m.receiveShadow = o.receive !== false; if (o.order != null) m.renderOrder = o.order; if (o.mirror) m.layers.enable(1); scene.add(m); return m; };

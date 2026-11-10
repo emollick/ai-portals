@@ -3886,8 +3886,9 @@ export default {
         kit.U.uTime.value = time;
         // WHICH PLACES ARE HANDED TO THE RENDERER: the eye's place by its side of the planes, and each neighbour unless
         // its one opening lies wholly beyond one of the four side planes of the eye's view
-        const e = camera.matrixWorld.elements, k = eyePlace(e[12], e[13], e[14]);
-        _fr.setFromProjectionMatrix(_pv.multiplyMatrices(camera.projectionMatrix, _inv.copy(camera.matrixWorld).invert()));
+        const visibilityCamera = camera.viewCamera || camera;
+        const e = visibilityCamera.matrixWorld.elements, k = eyePlace(e[12], e[13], e[14]);
+        _fr.setFromProjectionMatrix(_pv.multiplyMatrices(visibilityCamera.projectionMatrix, _inv.copy(visibilityCamera.matrixWorld).invert()));
         for (let i = 0; i < 4; i++) G[i].visible = i === k || (i === k + 1 && openingSeen(i)) || (i === k - 1 && openingSeen(k));
         for (const f of E.tick) f(dt, time);
       },

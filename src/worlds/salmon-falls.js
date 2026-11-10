@@ -4463,7 +4463,8 @@ void main(){
         // Of a lot that is drawn, one of its two meshes is shown: the cobble's 32 faces while the eye is under the
         // water's surface, the 8 faces while it is over it. Which, is sub above: the eye's own height against the
         // water over it, the very value by which the sky and the forest are not drawn from under water)
-        runFrustum.setFromProjectionMatrix(runPM.copy(camera.matrixWorld).invert().premultiply(camera.projectionMatrix));
+        const visibilityCamera = camera.viewCamera || camera;
+        runFrustum.setFromProjectionMatrix(runPM.copy(visibilityCamera.matrixWorld).invert().premultiply(visibilityCamera.projectionMatrix));
         for (const m of runLots) { const b = m.userData.box, dz = Math.max(b[2] - camW.z, camW.z - b[3], 0), g = upper || !runFrustum.intersectsBox(m.userData.bounds) ? 0 : 1 - ss(SIGHT_Z - RISE_Z, SIGHT_Z, dz); m.material.uniforms.uGrow.value = g; m.visible = g > 0 && sub; m.userData.air.visible = g > 0 && !sub; }
         // (the pool's company from the air: of the size the water's sight has just given a lot, its bodies take the share that falls and its cards the share that rises with the eye's height over the surface)
         { const air = ss(HOLD_AIR[0], HOLD_AIR[1], -d); for (const lot of holdLots) { const gb = lot.body.material.uniforms.uGrow, gc = lot.cards.material.uniforms.uGrow, g = gb.value; gb.value = g * (1 - air); gc.value = g * air; lot.body.visible = gb.value > 0; lot.cards.visible = gc.value > 0; } }

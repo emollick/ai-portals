@@ -1662,8 +1662,9 @@ export default {
       hero.update(dt, time, camera);
       // while the yoal is at the mouth of the burn and in the gorge the Needles are behind the eye or behind the hill: they are not drawn
       // when their whole bounding ball is outside the view (the frame cost of that stretch is the shore's own stitches)
+      const visibilityCamera = camera.viewCamera || camera;
       if (u > 0.415 && u < 0.6) hero.object.visible = false;      // (in the gorge the hill stands between)
-      else if (u > 0.3 && u < 0.7) { _fr.setFromProjectionMatrix(_pm.multiplyMatrices(camera.projectionMatrix, _mi.copy(camera.matrixWorld).invert())); let seen = false; for (const b of heroBalls) if (_fr.intersectsSphere(b)) { seen = true; break; } hero.object.visible = seen; } else hero.object.visible = true;
+      else if (u > 0.3 && u < 0.7) { _fr.setFromProjectionMatrix(_pm.multiplyMatrices(visibilityCamera.projectionMatrix, _mi.copy(visibilityCamera.matrixWorld).invert())); let seen = false; for (const b of heroBalls) if (_fr.intersectsSphere(b)) { seen = true; break; } hero.object.visible = seen; } else hero.object.visible = true;
       // the yoal: carried by the camera, lifted over every garter row, then passed up the cable crossing by crossing
       {
         const onCable = smoothstep(0.38, 0.43, u)*(1 - smoothstep(0.61, 0.67, u)), sea = 1 - smoothstep(0.37, 0.42, u);

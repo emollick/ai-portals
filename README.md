@@ -32,6 +32,14 @@ npm run preview
 
 The result is in `dist`, plain static files that any web host can serve, and the preview is at http://localhost:8001. Every script the project wrote is minified with esbuild, and the build adds the pieces that exist only on a deployed site: a small page for each world and journey so that shared links show a preview, a plain page that lists every world with its description, the gallery's record of which worlds are new, and the host's settings file. Each release has a short name, and this one is s8f. Run as `npm run build -- --stamp s8f`, this tree came out identical to the live site, file for file and byte for byte, on November 9, 2026. The site may have grown since.
 
+## WebXR
+
+In a WebXR-capable browser with a connected VR headset, choose **Enter VR**. The journey keeps
+playing automatically and you can look around freely. There are no controls or
+UI inside VR; use the headset's system menu to exit. The entry button appears
+only when the browser reports immersive VR support. WebXR requires HTTPS or
+localhost (the local `npm start` server works).
+
 ## Controls
 
 | Key | What it does |

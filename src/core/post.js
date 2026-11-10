@@ -146,6 +146,10 @@ export class Post {
   setSize(w, h, pixelRatio) { this.composer.setPixelRatio(pixelRatio); this.composer.setSize(w, h); this.guard.uniforms.uTexel.value.set(1 / Math.max(1, w * pixelRatio), 1 / Math.max(1, h * pixelRatio)); }
   // antialiasing level of the picture (0 = none); the buffers are rebuilt on their next use
   setSamples(n) { for (const rt of [this.composer.renderTarget1, this.composer.renderTarget2]) { rt.samples = n; rt.dispose(); } }
+  dispose() {
+    // Style passes belong to StyleLens and may be shared between eye pipelines.
+    this.guard.dispose(); this.bloom.dispose(); this.final.dispose(); this.composer.dispose();
+  }
   // an optional style lens runs after everything else (see style.js)
   setStylePass(pass) {
     if (this.stylePass) this.composer.removePass(this.stylePass);

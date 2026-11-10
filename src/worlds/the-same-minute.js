@@ -629,7 +629,8 @@ export default {
         uTime.value = time;
         camera.getWorldPosition(camPos); sky.position.copy(camPos);
         thorn.rotation.x = Math.sin(time * 1.3) * 0.012; thorn.rotation.z = Math.sin(time * 0.9 + 1) * 0.01;
-        pv.copy(camera.matrixWorld).invert().premultiply(camera.projectionMatrix); frustum.setFromProjectionMatrix(pv);
+        const visibilityCamera = camera.viewCamera || camera;
+        pv.copy(visibilityCamera.matrixWorld).invert().premultiply(visibilityCamera.projectionMatrix); frustum.setFromProjectionMatrix(pv);
         for (const ch of grassCells) ch.mesh.visible = ch.s.center.distanceTo(camPos) < GRASS_REACH && frustum.intersectsSphere(ch.s);
         hero.update(dt, time, camera, u);
         dress.update(time, camera);

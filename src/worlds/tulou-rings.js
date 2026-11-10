@@ -1360,7 +1360,8 @@ export default {
         // The roof's real rib tiles (TRUE_SIZE.rib, 0.25 m wide, laid on the stretches the flight skims) by a rule of true size, the same in every flight: drawn
         // while a stretch of them is in the frame and nearer than RIB_FAR, where a rib is one pixel wide at 1080 lines (0.25 / PX1080 = 216 m); the tile shader
         // draws a crest in each rib's place at any distance.
-        _fr.setFromProjectionMatrix(_pm.multiplyMatrices(camera.projectionMatrix, _pv.copy(camera.matrixWorld).invert()));
+        const visibilityCamera = camera.viewCamera || camera;
+        _fr.setFromProjectionMatrix(_pm.multiplyMatrices(visibilityCamera.projectionMatrix, _pv.copy(visibilityCamera.matrixWorld).invert()));
         { const on = ribBoxesW.some((bx) => bx.distanceToPoint(CP) < RIB_FAR && _fr.intersectsBox(bx)); for (const o of heroRibs) o.visible = on; }
         { let lvl = 0; if (inFrame(RING.A, 46)) for (const h of TIER_TOPS) { if (!seesOver(RING.A, 39, h)) break; lvl++; }
           insideSeen = lvl > 0; courtSeen = lvl >= 3; hero.setInside(lvl, courtSeen); }

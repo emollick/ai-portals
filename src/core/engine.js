@@ -2,6 +2,7 @@
 // swaps worlds at the crossing, and keeps doing that forever.
 import * as THREE from 'three';
 import { Post, normalizePost, blendPost, POST_DEFAULTS } from './post.js';
+import { setXRProjection } from './xr-camera.js';
 import { Portal } from './portal.js';
 import { installSafeMath } from './safemath.js';
 import { TIERS, QUALITY_LEVELS, Governor, guessTier, ratioFor, fovFor, isMobile } from './quality.js';
@@ -130,7 +131,7 @@ export class Engine {
     canvas.addEventListener('webglcontextrestored', () => this.events.status({ restored: true }));
     this._last = performance.now();
     this._tick = this._tick.bind(this);
-    requestAnimationFrame(this._tick);
+    renderer.setAnimationLoop(this._tick);
   }
 
   _makePortalRT() {
@@ -160,6 +161,7 @@ export class Engine {
     this.adaptive = !this.fixedPR && !this.opts.freeze && t.adapt;
   }
   _resize(force) {
+    if (this.renderer.xr.isPresenting) return;
     const w = window.innerWidth, h = window.innerHeight;
     if (!force && w === this.w && h === this.h) return;
     if (w < 2 || h < 2) return;
@@ -581,7 +583,7 @@ export class Engine {
   // ---------- camera ----------
   // Gentle: the visitor's one comfort choice (the steady camera, or 'calm worlds only', which includes it). It means the
   // steady camera with its level horizon and firm ceiling, no surprise rides (core/extras.js) and a gentler hurry.
-  get gentle() { return this.settings.camera === 'steady' || !!this.settings.calmOnly; }
+  get gentle() { return this.renderer.xr.isPresenting || this.settings.camera === 'steady' || !!this.settings.calmOnly; }
   // The camera's slow turn toward the gaze of _pose, one step of dt seconds. A steady camera (calm) also turns more
   // slowly, and its turn has a ceiling: with calm 0 this is the plain slerp and nothing else. tools/calm.mjs replays
   // flights with this same function.
@@ -687,8 +689,8 @@ export class Engine {
   // camera matrix in its own space) or portal.feedFov, by that one. The last 3 m are the engine's again, so every
   // crossing is the exact window. A world that has read ctx.portalView is told where the picture is in the buffer
   // (rect) and how to find a point of its own space in it (matrix).
-  _renderPortal(A, B, dt) {
-    const cam = this.camera, P = A.portal, rim = P.rim, G = P.group.matrixWorld, feed = A.feed;
+  _renderPortal(A, B, dt, cam = this.camera, update = true, draw = true, viewingCamera = null) {
+    const P = A.portal, rim = P.rim, G = P.group.matrixWorld, feed = A.feed;
     let minX = 1, maxX = -1, minY = 1, maxY = -1, minDepth = Infinity, behind = false, fit = 0, cx = 0, cy = 0, rimIn = Infinity;
     for (let i = rim.length - 1; i >= 0; i--) {                 // the last rim point is the centre: it comes first
       const p = rim[i];
@@ -706,8 +708,8 @@ export class Engine {
       }
     }
     this.rimIn = rimIn;   // the rim point nearest the middle of the frame, in half-frames: under 1, a point of the rim is in the picture
-    if (behind) { if (minDepth < -P.boundR * 2 && !feed) return false; minX = minY = -1; maxX = maxY = 1; }
-    if (!feed && (maxX < -1 || minX > 1 || maxY < -1 || minY > 1)) return false;
+    if (behind) { if (draw && minDepth < -P.boundR * 2 && !feed) return false; minX = minY = -1; maxX = maxY = 1; }
+    if (draw && !feed && (maxX < -1 || minX > 1 || maxY < -1 || minY > 1)) return false;
 
     const pc = this.portalCam, last = feed && A.path.length - A.dist < 3;
     // full size from the next frame on (the world has this frame's texture already) once the opening is that large
@@ -763,15 +765,18 @@ export class Engine {
     // camera.nearThrough on the next world: draw it from that near distance, so its ground or sea in front of its entry is
     // in the picture (for a path that starts lower above the surface than the opening is tall); otherwise from the opening's nearest point
     pc.near = pose ? B.cam.near : B.cam.nearThrough != null ? B.cam.nearThrough : Math.max(B.cam.near, minDepth * 0.96);
-    pc.updateProjectionMatrix();
+    if (this.renderer.xr.isPresenting) setXRProjection(pc, cam.projectionMatrix);
+    else pc.updateProjectionMatrix();
     P.setNextView(_C.premultiply(pc.projectionMatrix));
     const V = A.view.used ? A.view : null;
     if (V) V.matrix.multiplyMatrices(_C, A.exitInv);
     this.lensNow = s;
-    B.time += dt;
+    if (update) B.time += dt;
+    pc.viewCamera = viewingCamera;
     // (on a pause a world that has been updated once stands as it was last drawn: see frame())
-    if (!(B._ran && this.settings.paused && !this.opts.freeze)) { B._ran = true; try { B.world.update?.(dt, B.time, pc, 0); } catch (e) { if (!B._err) { B._err = 1; console.error(e); } } }
+    if (update && !(B._ran && this.settings.paused && !this.opts.freeze)) { B._ran = true; try { B.world.update?.(dt, B.time, pc, 0); } catch (e) { if (!B._err) { B._err = 1; console.error(e); } } }
     if (B.feed) B.portal.group.visible = B.world.portal.show !== false;
+    if (!draw) return true;   // update-only: the combined XR view culls once for both eyes
     const rt = this._feedBuf(A); if (rt === A.feedRT) this._fitFeed(A);
     const W = rt.width, H = rt.height, pad = 3;
     let x0 = 0, x1 = W, y0 = 0, y1 = H;
@@ -800,7 +805,6 @@ export class Engine {
 
   // ---------- frame ----------
   _tick(now) {
-    requestAnimationFrame(this._tick);
     const gap = now - this._last, raw = Math.min(Math.max(0.1, this.opts.maxDt || 0), gap / 1000); this._last = now;
     this._gap = this._gap == null ? 16.7 : this._gap + (Math.min(gap, 1000) - this._gap) * 0.2;   // how often frames come round, smoothed (see _anteMs)
     if (!this.opts.hold) {   // hold: freeze-mode harness renders on demand only
@@ -850,7 +854,7 @@ export class Engine {
     }
 
     const cam = this.camera, u = clamp(A.dist / L, 0, 1), remaining = L - A.dist;
-    const calmTo = this.settings.camera === 'steady' || this.settings.calmOnly ? 1 : 0;   // a calm journey always flies with the steady camera
+    const calmTo = this.gentle ? 1 : 0;   // a calm journey always flies with the steady camera
     this.calm = frozen ? calmTo : this.calm + clamp(calmTo - this.calm, -raw * 0.7, raw * 0.7);
     this._pose(A, A.dist, cam.position, _q);
     if (!this.camInit || frozen) { this.camQuat.copy(_q); this.camInit = true; }
@@ -912,6 +916,9 @@ export class Engine {
     cam.updateProjectionMatrix();
     cam.updateMatrixWorld(true);
 
+    // Authored motion follows the flight camera; visibility alone follows the head.
+    cam.viewCamera = this.renderer.xr.isPresenting && this.vr ? this.vr.prepareView(cam) : null;
+
     if (A.goFull && !A.full) { A.full = true; A.portal.setTexture(this.portalRT.texture); }   // a feed grown large: see _feedBuf
     // ctx.portalView for the world's update(): the texture is the real one only while it holds a picture of the next
     // world (a feed world's is drawn below, before the world itself; another world's was drawn last frame)
@@ -937,7 +944,7 @@ export class Engine {
     for (const p of progs) known.add(p);
     const t1 = performance.now();
     let portalTris = 0, portalCalls = 0, drew = false;
-    if (B && (A.feed || this.reveal > 0.002)) {
+    if (!this.renderer.xr.isPresenting && B && (A.feed || this.reveal > 0.002)) {
       drew = this._renderPortal(A, B, dt);
       // THE TAKE-BACK ENDS WHERE THE OPENING FILLS THE FRAME. What the opening takes back is this world's glow lying over it: the
       // rim's, a bright sky's beside it. Once no point of the rim is left in the frame there is none of that, only the glow of the
@@ -951,7 +958,8 @@ export class Engine {
     if (A.view.used) A.shown = drew ? B : null;
     const t2 = performance.now();
     this.fade = Math.min(1, this.fade + (frozen ? 1 : raw * 0.6));
-    this.post.render(A.scene, cam, this.postNow, this.time, this.fade);
+    if (this.renderer.xr.isPresenting && this.vr) this.vr.render(A, B, dt);
+    else this.post.render(A.scene, cam, this.postNow, this.time, this.fade);
     const t3 = performance.now(); let fresh = null;
     for (const p of progs) if (!known.has(p)) { known.add(p); (fresh || (fresh = [])).push((p.type || '?') + (p.name ? ':' + p.name : '')); }
     if (fresh) this.perf.shaders(A.def.id, u, fresh, t3 - t1); else { this.perf.mark('portal-draw', t2 - t1); this.perf.mark('draw', t3 - t2); }
@@ -962,7 +970,7 @@ export class Engine {
       pr: Math.round(this.pr * 100) / 100, quality: this.tier, fps: Math.round(this.fps), size: Math.floor(this.w * this.pr) + 'x' + Math.floor(this.h * this.pr), aa: this.samples, next: B?.def.id, lens: Math.round((this.lensNow ?? 1) * 100) / 100, view: A.view.used ? +A.view._live : undefined };
 
     if (this._trash.length) this._clear();
-    if (this.adaptive && dt > 0 && !this.boost && !A.def.antechamber) this._adapt(raw);   // frames while hurrying to the portal say nothing about the usual load, nor do the antechamber's (near free to draw, with world 1 being built between them)
+    if (!this.renderer.xr.isPresenting && this.adaptive && dt > 0 && !this.boost && !A.def.antechamber) this._adapt(raw);   // headset resolution is supplied by the XR runtime
   }
 
   // test aid: renders the current view into a float buffer and counts pixels that are not finite or absurd

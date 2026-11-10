@@ -188,3 +188,5 @@ body.idle #share { opacity: 0; pointer-events: none; }
 .about-film:hover .about-play, .about-film:focus-visible .about-play { background: rgba(10,12,18,0.85); }
 .about-video { display: block; width: 100%; aspect-ratio: 16 / 9; margin: 2px 0 16px; border-radius: 12px; background: #000; }
 @media (max-height: 480px) { .about-card { padding: 18px 24px 12px; font-size: 14px; } .about-card h2 { margin-bottom: 8px; } }
+#b-vr { position: fixed; right: 20px; top: 20px; z-index: 30; padding: 10px 18px; border: 1px solid #ffffff66; border-radius: 20px; background: #101522cc; color: white; font: inherit; cursor: pointer; }
+#b-vr[hidden], .in-vr #b-vr { display: none !important; }

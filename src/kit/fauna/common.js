@@ -790,14 +790,15 @@ export function makeFauna(scene, o = {}) {
     setLight(light, over) { api.light = light; for (const it of items) if (it.f.setLight) it.f.setLight(light, over); },
     // active = false: the whole group is out of play (another habitat) and nothing is drawn, except the one-instance warm-up draws
     update(dt, time, camera, u, active = true) {
+      const visibilityCamera = camera?.viewCamera || camera;
       const fog = scene && scene.fog, reach = fog ? (fog.isFogExp2 ? 2.6 / Math.max(fog.density, 1e-6) : fog.far) : Infinity;
       let budget = rate, frustum = false;
       for (const it of items) {
         const b = it.f.bounds; let on = active, seen = active;
         if (on && b && !it.always && camera) {
           _sph.copy(b).applyMatrix4(it.f.object.matrixWorld);
-          on = _sph.center.distanceTo(camera.position) - _sph.radius < Math.min(reach, it.range ?? Infinity); seen = on;
-          if (on && !it.warmed) { if (!frustum) { _fr.setFromProjectionMatrix(_pm.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)); frustum = true; } seen = _fr.intersectsSphere(_sph); }
+          on = _sph.center.distanceTo(visibilityCamera.position) - _sph.radius < Math.min(reach, it.range ?? Infinity); seen = on;
+          if (on && !it.warmed) { if (!frustum) { _fr.setFromProjectionMatrix(_pm.multiplyMatrices(visibilityCamera.projectionMatrix, visibilityCamera.matrixWorldInverse)); frustum = true; } seen = _fr.intersectsSphere(_sph); }
         }
         if (it.stub) { stub(it, false); it.stub = false; it.warmed = true; }
         else if (!it.warmed) { if (seen) it.warmed = true; else if (budget-- > 0) { stub(it, true); it.stub = true; on = true; } }

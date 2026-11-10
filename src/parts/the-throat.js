@@ -730,6 +730,17 @@ export async function buildThroat(ctx, opts) {
   });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.frustumCulled = false; mesh.renderOrder = 0;
+  const drawSize = new THREE.Vector2();
+  // Rays follow the camera drawing this triangle, including each XR eye and
+  // portal view. The update camera below remains the authored flight pose.
+  mesh.onBeforeRender = (renderer, scene, camera) => {
+    const pe = camera.projectionMatrix.elements, target = renderer.getRenderTarget();
+    const height = target ? target.height : renderer.getDrawingBufferSize(drawSize).y;
+    uniforms.uCam.value.copy(camera.matrixWorld);
+    uniforms.uProj.value.set(pe[0], pe[5], pe[8], pe[9]);
+    uniforms.uPx.value = 2 / (Math.max(pe[5], 1e-3) * Math.max(height, 1));
+    mat.uniformsNeedUpdate = true;
+  };
   await ctx.yield();
 
   const sstep = (e0, e1, x) => { const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
@@ -761,10 +772,7 @@ export async function buildThroat(ctx, opts) {
   const state = { l: LEN, ease: 0, live: 0, feedFov: FOV0, boatX: 0, zoom: ZOOM0 };
   function update(dt, time, camera, u, renderer) {
     const U = uniforms, pe = camera.projectionMatrix.elements;
-    U.uCam.value.copy(camera.matrixWorld);
-    U.uProj.value.set(pe[0], pe[5], pe[8], pe[9]);
     renderer.getDrawingBufferSize(size);
-    U.uPx.value = 2 / (Math.max(pe[5], 1e-3) * Math.max(size.y, 1));
     U.uTime.value = time;
     camera.matrixWorld.decompose(eye, qCam, sc);
     const lp = LEN * (1 - u);                                   // metres left to fly: every scripted thing hangs on it

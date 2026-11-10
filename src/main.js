@@ -1,4 +1,5 @@
 import { Engine } from './core/engine.js';
+import { setupVR } from './core/vr.js';
 import * as REGISTRY from './worlds/index.js';
 const WORLDS = REGISTRY.WORLDS, SUITES = REGISTRY.SUITES || [];   // a tree whose own registry has no list of journeys still loads
 import { RIDES, COMPANIONS, STYLES } from './extras.js';
@@ -64,6 +65,7 @@ async function boot() {
     camera: plain ? (q.get('camera') || 'sweeping') : (q.get('camera') === 'steady' || saved.camera === 'steady' || ((!saved.camera || !saved.cameraSet) && matchMedia('(prefers-reduced-motion: reduce)').matches) ? 'steady' : 'sweeping'),
   });
   window.__engine = engine;
+  setupVR(engine);
   if (q.get('guard') === '0') engine.post.guard.enabled = false;   // test aid: shows what an invalid pixel does without the clean-up pass
   if (q.has('strange')) engine.settings.strangeness = num('strange', 0.5);
   // the pace: asked for in the link, else the one chosen on an earlier visit (kept inside the slider's own range). A link's
