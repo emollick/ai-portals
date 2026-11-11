@@ -27,6 +27,12 @@ async function boot() {
   // remembered choices; test pages (one world, or frozen) ignore them
   let saved = {}; try { saved = JSON.parse(localStorage.getItem('portals.settings') || '{}') || {}; } catch (e) {}
   const plain = !!only || freeze;
+  // A broadcast (?stream=1): the bar, the cursor and the passing notes are hidden, the title cards stay, and music plays from
+  // files, a new track at every portal (core/music.js). ?music=1 asks for the music alone, ?music=<address of a track list>
+  // names a list kept elsewhere, and ?stream=1&music=0 is the broadcast without it.
+  const stream = !plain && q.has('stream') && q.get('stream') !== '0';
+  const musicAsk = plain ? null : q.has('music') ? q.get('music') : stream ? '1' : null;
+  let music = null;
   // the level 'auto' settled on last time is trusted for three days, then the machine gets a fresh guess
   let autoTier = !plain && saved.autoTier && Date.now() - saved.autoTier.at < 3 * 864e5 ? saved.autoTier : null;
 
@@ -131,6 +137,7 @@ async function boot() {
     clearTimeout(titleTimer);
     titleTimer = setTimeout(() => { title.classList.add('show'); titleTimer = setTimeout(() => title.classList.remove('show'), line ? 8500 : 7000); }, 1400);
     if (window.__audio) window.__audio.world(W);
+    if (music) { const tr = music.world(W); if (tr) $('title-meta').textContent += '  ·  ♪ ' + tr.title; }   // the song that starts with this world, on its card
   };
   engine.events.status = (s) => {
     if (s.error) window.__errors = (window.__errors || []).concat(s.error);
@@ -165,6 +172,10 @@ async function boot() {
   if (ante && first && first.load) first.load().catch(() => {});   // world 1's module is fetched meanwhile; the engine builds it once the antechamber is on screen
   engine.events.antechamber = () => { $('veil-sub').textContent = ''; $('veil').style.transitionDuration = '1.4s'; };   // 'finding a world' goes at once, and the veil lifts faster than it does off a world: the picture fades up from black by itself
   // (should the antechamber itself fail to load, the visit starts in world 1 as it did before there was one)
+  if (musicAsk && musicAsk !== '0') {
+    try { const m = await import('./core/music.js'); music = await m.createMusic({ list: /^(1|true|)$/.test(musicAsk) ? undefined : musicAsk, fade: num('fade', 4), volume: num('volume', 0.85), intro: q.get('intro') === '1' }); window.__music = music; }
+    catch (e) { console.warn('music unavailable', e); }
+  }
   const W = await engine.start(ante || first, ante ? first : second).catch((e) => { if (!ante) throw e; console.warn('antechamber', e); return engine.start(first, second); });
 
   if (freeze) {
@@ -213,6 +224,7 @@ async function boot() {
 
   $('veil').classList.add('gone');
   if (q.get('hud') === '0') { $('hud').style.display = 'none'; title.style.display = 'none'; }
+  if (stream) document.body.classList.add('stream');
   const coarse = matchMedia('(pointer: coarse)').matches;
 
   // keep the screen awake while the journey plays: nobody touches anything for minutes at a time

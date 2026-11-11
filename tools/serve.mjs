@@ -9,6 +9,7 @@ const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.webmanifest': 'application/manifest+json',
   '.txt': 'text/plain; charset=utf-8', '.jpg': 'image/jpeg', '.png': 'image/png', '.svg': 'image/svg+xml',
+  '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.flac': 'audio/flac',
 };
 if (!fs.existsSync(root)) { console.error(`there is no folder ${root}` + (process.argv[2] === 'dist' ? ' yet: run "npm run build" first' : '')); process.exit(1); }
 const server = http.createServer((req, res) => {
@@ -26,7 +27,16 @@ const server = http.createServer((req, res) => {
     }
     fs.readFile(file, (e2, body) => {
       if (e2) return say(404, 'not found');
-      res.writeHead(200, { 'Content-Type': TYPES[path.extname(file).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+      const head = { 'Content-Type': TYPES[path.extname(file).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'no-cache', 'Accept-Ranges': 'bytes' };
+      // a part of a file (bytes=a-b): the music's tracks start part-way in, and a browser asks for that part
+      const m = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+      if (m && (m[1] || m[2]) && body.length) {
+        const a = m[1] ? Number(m[1]) : Math.max(0, body.length - Number(m[2])), b = m[1] && m[2] ? Math.min(Number(m[2]), body.length - 1) : body.length - 1;
+        if (a > b || a >= body.length) { res.writeHead(416, { 'Content-Range': `bytes */${body.length}` }); return res.end(); }
+        res.writeHead(206, { ...head, 'Content-Range': `bytes ${a}-${b}/${body.length}`, 'Content-Length': b - a + 1 });
+        return res.end(req.method === 'HEAD' ? undefined : body.subarray(a, b + 1));
+      }
+      res.writeHead(200, head);
       res.end(req.method === 'HEAD' ? undefined : body);
     });
   });

@@ -44,6 +44,8 @@ fs.copyFileSync(path.join(root, 'src/ui/ui.css'), path.join(out, 'src/ui/ui.css'
 // home-screen install: the manifest and its icons
 fs.copyFileSync(path.join(root, 'manifest.webmanifest'), path.join(out, 'manifest.webmanifest'));
 fs.cpSync(path.join(root, 'icons'), path.join(out, 'icons'), { recursive: true });
+// the broadcast's music, when there is any (music/tracks.json and the files it lists: core/music.js)
+if (fs.existsSync(path.join(root, 'music', 'tracks.json'))) fs.cpSync(path.join(root, 'music'), path.join(out, 'music'), { recursive: true });
 // the notices of the open-source work the site builds on (shipped files are minified with their comments stripped)
 if (fs.existsSync(path.join(root, 'THIRD-PARTY-NOTICES.txt'))) fs.copyFileSync(path.join(root, 'THIRD-PARTY-NOTICES.txt'), path.join(out, 'THIRD-PARTY-NOTICES.txt')); else console.warn('THIRD-PARTY-NOTICES.txt is missing: the package ships no notices');
 // the hidden index of worlds (src/ui/atlas.js): which release each world arrived in, and a small picture of each.

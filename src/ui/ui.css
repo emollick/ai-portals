@@ -53,6 +53,9 @@ body.idle #panel { opacity: 0; pointer-events: none; }
 #kinds button.calm { flex-basis: 100%; border-style: dashed; }
 #kinds button.calm.on { border-style: solid; background: rgba(150,215,255,0.26); }
 body.notitles #title { display: none; }
+/* a broadcast (?stream=1): no bar, no cursor, no passing notes; the title cards stay */
+body.stream, body.stream * { cursor: none !important; }
+body.stream #hud, body.stream #panel, body.stream #share, body.stream #toast { display: none !important; }
 #toast { position: fixed; left: 50%; bottom: 18vh; transform: translateX(-50%); max-width: calc(100vw - 48px); box-sizing: border-box; text-align: center; padding: 9px 16px; border-radius: 999px; background: rgba(10,12,18,0.6); font: 11px/1.4 ui-sans-serif, system-ui, sans-serif; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0; transition: opacity 0.5s ease; pointer-events: none; z-index: 6; }
 #toast.show { opacity: 1; }
 

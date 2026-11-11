@@ -48,6 +48,35 @@ The result is in `dist`, plain static files that any web host can serve, and the
 
 Move the mouse and a bar appears at the bottom of the screen with a button for each of these, and two sliders: Pace, and one that runs from Earthly to Strange (in a narrow window the sliders move into the options).
 
+## Broadcasting it, with music
+
+This fork adds a broadcast mode for capturing the flight as a live stream (OBS's browser source, or a browser on a server):
+
+```
+https://your-site.example/?stream=1&quality=high
+```
+
+`?stream=1` hides the bar, the cursor and the passing notes, keeps the title cards, and plays music from files: a new track fades in at every portal, and the card of each world names the song that starts with it.
+
+1. Put the songs (mp3, m4a, ogg, wav or flac) in a folder named `music` at the top of the repository.
+2. Run `npm run tracks`. It writes `music/tracks.json`, the list the page reads; run it again whenever the folder changes. A title is made from each file's name, and the list can be edited by hand: `{ "file": "chrome-sunset.mp3", "title": "Chrome Sunset", "start": 20 }`.
+3. `npm start` and open http://localhost:8000/?stream=1 to hear it, then build and deploy as usual; the build copies the folder.
+
+A world lasts 40 to 50 seconds, so a track does not begin at its first bar: it comes in somewhere in its first half, or at its own `start` (seconds). Every track plays once before any comes round again.
+
+| In the link | What it does |
+|---|---|
+| `stream=1` | Broadcast: no bar, no cursor, music on |
+| `music=1` | The music alone, with the page as it is |
+| `music=https://.../tracks.json` | A track list kept elsewhere (a storage bucket); the files are found beside it |
+| `stream=1&music=0` | Broadcast without music |
+| `fade=4` | Seconds a crossing takes (4) |
+| `volume=0.85` | 0 to 1 (0.85) |
+| `intro=1` | Every track from its first bar |
+| `speed=0.6` | The site's own pace setting, 0.4 to 2.5: slower worlds, longer stretches of each song |
+
+A browser plays no sound until the page has been clicked. OBS's browser source allows it as it is; Chrome on a server is started with `--autoplay-policy=no-user-gesture-required`; anywhere else the music starts at the first click or key.
+
 ## Layout
 
 ```
