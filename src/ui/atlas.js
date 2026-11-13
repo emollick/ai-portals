@@ -7,8 +7,8 @@ import { byline } from './share.js';
 // 'media' is one heading for every world imagined from a film, a television series or a record, and 'books' the heading after it;
 // a world's own category 'screen', its book and its music are read by kindOf below. 'ai-in-jokes' is the heading of the worlds
 // of that journey (a registry row's `set`).
-const KIND_ORDER = ['wilderness', 'prehistoric', 'ocean', 'sky', 'city', 'interior', 'domestic', 'alien', 'bizarre', 'ai-in-jokes', 'wonders', 'artists', 'media', 'books'];
-const KIND_NAMES = { media: 'From film, television and music', screen: 'From film, television and music', 'ai-in-jokes': 'AI in-jokes', wilderness: 'Wilderness', prehistoric: 'Prehistoric', ocean: 'Oceans', sky: 'Skies', city: 'Cities', interior: 'Interiors', domestic: 'At home', alien: 'Alien', bizarre: 'Bizarre', wonders: 'The Seven Wonders', artists: 'After the artists', books: 'From books' };
+const KIND_ORDER = ['hitchhikers', 'wilderness', 'prehistoric', 'ocean', 'sky', 'city', 'interior', 'domestic', 'alien', 'bizarre', 'ai-in-jokes', 'wonders', 'artists', 'media', 'books'];
+const KIND_NAMES = { hitchhikers: "The Hitchhiker's Guide to the Galaxy", media: 'From film, television and music', screen: 'From film, television and music', 'ai-in-jokes': 'AI in-jokes', wilderness: 'Wilderness', prehistoric: 'Prehistoric', ocean: 'Oceans', sky: 'Skies', city: 'Cities', interior: 'Interiors', domestic: 'At home', alien: 'Alien', bizarre: 'Bizarre', wonders: 'The Seven Wonders', artists: 'After the artists', books: 'From books' };
 const TEXT_MIN = 100;   // texts a release must carry before the gallery shows the way to the text gallery
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
@@ -145,7 +145,7 @@ export function setupAtlas({ worlds, suites = [], engine, setPaused, optionsButt
       // a world from a film, a television series or a record under "From film, television and music", a world from a book
       // under "From books" after it, a wonder under "The Seven Wonders", a world of a set that has a heading (the AI
       // in-jokes) under that, every other under its own kind
-      const kindOf = (w) => (w.after ? 'artists' : isBook(w) ? 'books' : isMedia(w) ? 'media' : w.wonder ? 'wonders' : w.set && KIND_NAMES[w.set] ? w.set : w.category);
+      const kindOf = (w) => (w.set === 'hitchhikers' ? 'hitchhikers' : w.after ? 'artists' : isBook(w) ? 'books' : isMedia(w) ? 'media' : w.wonder ? 'wonders' : w.set && KIND_NAMES[w.set] ? w.set : w.category);
       const kinds = [...new Set(shown.map(kindOf))].sort((a, b) => ((KIND_ORDER.indexOf(a) + 99) % 99) - ((KIND_ORDER.indexOf(b) + 99) % 99));
       // a book with three worlds or more is a series: its worlds stand together under the book's own heading, right after the other books
       const perBook = {}; for (const w of list) if (w.book && !w.after) perBook[w.book] = (perBook[w.book] || 0) + 1;

@@ -119,7 +119,7 @@ varying vec3 vC; varying float vS;
 void main() {
   vec4 mv = modelViewMatrix * vec4(position, 1.0); float d = max(0.5, -mv.z);
   float raw = aSize * uPx / d, sz = min(max(raw, uMin), uMax);
-  gl_PointSize = sz; vS = smoothstep(2.5, 7.0, sz);
+  gl_PointSize = sz; vS = uMin > 0.5 ? smoothstep(2.5, 7.0, sz) : 1.0;
   float dim = uMin > 0.5 ? clamp(raw / uMin, 0.45, 1.0) : clamp(raw / 1.3, 0.0, 1.0);      // a far lamp stays a dot; a far mote goes out
   float fl = 1.0 + 0.09 * sin(uTime * (5.0 + aPh * 7.0) + aPh * 40.0) * sin(uTime * 2.3 + aPh * 11.0);
   vC = aCol * fl * uGain * dim * exp(-fogDensity * fogDensity * d * d);
@@ -179,7 +179,7 @@ void main() {
   float lane2 = smoothstep(0.5, 0.72, n2) * exp(-pow(lat / (width * 0.95), 2.0)) * 0.55;
   float dark = clamp(1.0 - 0.93 * lane - lane2, 0.04, 1.0);
   vec3 cool = vec3(0.52, 0.66, 1.0), warm = vec3(1.0, 0.80, 0.56);
-  vec3 col = mix(cool, warm, clamp(centre * centre * 1.1 + bulge * 0.5, 0.0, 1.0)) * (band * 0.17 + bulge * 0.22) * dark;
+  vec3 col = mix(cool, warm, clamp(centre * centre * 1.1 + bulge * 0.5, 0.0, 1.0)) * (band * 0.16 + bulge * 0.17) * dark;
   col += vec3(1.0, 0.85, 0.7) * band * pow(n3, 3.0) * dark * 0.45;      // the grain of stars too many to draw
   // nebulae: red knots where the lanes fray, teal veils beside the band, a violet haze at high latitude
   float k1 = pow(smoothstep(0.55, 0.85, fbm(d * 5.0 + vec3(11.0, 3.0, 5.0))), 2.0) * exp(-pow(lat / (width * 1.3), 2.0));
@@ -219,8 +219,8 @@ void main() {
   mv.xy += p;
   vDepth = -mv.z;
   float ds = distance(iPos, uShip);
-  float after = step(iTrail.x, uShipQ) * exp(-(uShipQ - iTrail.x) * 5.0) / (1.0 + iTrail.y * iTrail.y / (110.0 * 110.0));
-  vLit = uFlame * 1.25 / (1.0 + ds * ds / (uLitR * uLitR)) + 0.5 * after;
+  float after = step(iTrail.x, uShipQ) * exp(-(uShipQ - iTrail.x) * 14.0) / (1.0 + iTrail.y * iTrail.y / (70.0 * 70.0));
+  vLit = (uFlame * 1.25 / (1.0 + ds * ds / (uLitR * uLitR)) + 0.4 * after) * (0.5 + fract(iSeed * 7.31));      // the fire lights what is near it; no two billows take it alike
   gl_Position = projectionMatrix * mv;
 }`;
 const PUFF_FRAG = /* glsl */`
@@ -229,16 +229,16 @@ varying vec2 vUv; varying float vDepth, vLit, vKind, vSeed;
 void main() {
   vec2 uv = vUv; if (vSeed > 0.5) uv.x = 1.0 - uv.x;
   vec4 t = texture2D(uTex, uv);
-  float a = t.a * uOpacity * smoothstep(uNear * 0.2, uNear, vDepth) * clamp(vLit * 6.0 + uInside, 0.0, 1.0);
+  float a = t.a * uOpacity * smoothstep(uNear * 0.2, uNear, vDepth) * clamp(vLit * 3.0 + uInside, 0.0, 1.0);
   if (a < 0.004) discard;
   vec3 dust = mix(vec3(0.020, 0.017, 0.024), vec3(0.060, 0.052, 0.066), t.r);
   vec3 warm = vec3(1.0, 0.50, 0.19) * vLit * uWarm * (0.2 + 0.8 * t.r);
-  vec3 star = vec3(0.060, 0.080, 0.135) * vKind * uStar * (0.06 + 0.94 * t.r * t.r);
+  vec3 star = vec3(0.095, 0.125, 0.205) * vKind * uStar * (0.05 + 0.95 * t.r * t.r);
   vec3 col = dust * (1.0 - vKind * 0.5) + warm + star;
   float f = 1.0 - exp(-fogDensity * fogDensity * vDepth * vDepth);
-  col = mix(col, fogColor, f * (1.0 - vKind * uAbove));
+  col = mix(col, fogColor * uInside, f * (1.0 - vKind * uAbove));      // seen from under the cloud, what the fire does not reach is the black sky
   // from above, far billows sink into the haze of the cloud's horizon
-  col = mix(col, vec3(0.012, 0.016, 0.03) * uStar, vKind * uAbove * (1.0 - exp(-vDepth * 0.00016)));
+  col = mix(col, vec3(0.022, 0.030, 0.055) * uStar, vKind * uAbove * (1.0 - exp(-vDepth * 0.00011)));
   gl_FragColor = vec4(col, a);
 }`;
 const TRAIL_VERT = /* glsl */`
@@ -249,10 +249,10 @@ void main() {
   vec3 wp = position;
   vec3 side = normalize(cross(aTan, normalize(cameraPosition - wp)));
   float age = max(0.0, uShipQ - aQ);
-  float w = (1.1 + 24.0 * pow(age, 0.8)) * (0.8 + 0.3 * sin(aQ * 310.0) * sin(aQ * 97.0 + 1.0));
+  float w = (0.5 + 1.7 * pow(age, 0.5)) * (0.8 + 0.3 * sin(aQ * 310.0) * sin(aQ * 97.0 + 1.0));
   wp += side * aSide * w;
   vec4 mv = viewMatrix * vec4(wp, 1.0);
-  vSide = aSide; vAge = age; vQ = aQ; vFog = exp(-fogDensity * fogDensity * mv.z * mv.z * 0.35);
+  vSide = aSide; vAge = age; vQ = aQ; vFog = exp(-fogDensity * fogDensity * mv.z * mv.z * 0.35) * smoothstep(6.0, 70.0, -mv.z);
   gl_Position = projectionMatrix * mv;
 }`;
 const TRAIL_FRAG = /* glsl */`
@@ -260,12 +260,10 @@ uniform float uShipQ, uFlame;
 varying float vSide, vAge, vFog, vQ;
 void main() {
   if (vQ > uShipQ) discard;
-  float x = abs(vSide), w = 1.1 + 24.0 * pow(vAge, 0.8);
-  float core = exp(-x * x * w * w * 0.5);                 // a hot thread about a metre wide whatever the smoke has spread to
-  float hot = exp(-vAge * 26.0);
-  vec3 col = vec3(1.0, 0.93, 0.80) * core * (0.55 + 3.2 * hot * uFlame);
-  col += vec3(1.0, 0.50, 0.16) * exp(-x * x * 5.0) * exp(-vAge * 9.0) * 0.3 * uFlame;
-  col += vec3(0.30, 0.25, 0.24) * exp(-x * x * 3.0) * (1.0 - x) * 0.045 * smoothstep(0.0, 0.02, vAge);      // the smoke it leaves, lit by its own thread
+  float x = abs(vSide);
+  float core = exp(-x * x * 9.0), hot = exp(-vAge * 26.0);
+  vec3 col = vec3(1.0, 0.90, 0.74) * core * (0.16 + 0.3 * exp(-vAge * 4.0) + 3.2 * hot * uFlame);
+  col += vec3(1.0, 0.50, 0.16) * exp(-x * x * 2.5) * exp(-vAge * 9.0) * 0.3 * uFlame;
   gl_FragColor = vec4(col * vFog, 1.0);
 }`;
 const WATER_VERT = /* glsl */`
@@ -303,8 +301,8 @@ void main() {
   vec2 p = vW.xz; float h = H(p), h2 = H(p + uLdir * 150.0);
   float sh = clamp(0.5 + (h2 - h) * -7.0, 0.0, 1.0), crest = smoothstep(0.34, 0.72, h);      // the slopes that face the galaxy's heart take its light
   vec3 col = mix(vec3(0.003, 0.004, 0.008), vec3(0.036, 0.048, 0.082), crest * 0.45 + sh * 0.6 * (0.3 + crest)) * uStar;
-  col += vec3(0.030, 0.022, 0.012) * sh * crest * uStar;
-  col = mix(col, vec3(0.010, 0.014, 0.027) * uStar, 1.0 - exp(-vDepth * 0.00014));
+  col += vec3(0.030, 0.022, 0.012) * sh * crest * uStar; col *= 1.6;
+  col = mix(col, vec3(0.022, 0.030, 0.055) * uStar, 1.0 - exp(-vDepth * 0.00011));
   gl_FragColor = vec4(col, 1.0);
 }`;
 
@@ -322,7 +320,7 @@ export default {
     const noise = makeNoise(Math.floor(rng() * 1e9));
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#000000');
-    const fogLow = new THREE.Color(0.006, 0.010, 0.018), fogDust = new THREE.Color(0.030, 0.026, 0.036), fogWarm = new THREE.Color(0.115, 0.055, 0.022);
+    const fogLow = new THREE.Color(0.006, 0.010, 0.018), fogDust = new THREE.Color(0.013, 0.011, 0.016), fogWarm = new THREE.Color(0.115, 0.055, 0.022);
     scene.fog = new THREE.FogExp2(fogLow.clone(), 0.00055);
     const trash = []; const keep = (o) => { trash.push(o); return o; };
     const FOGU = () => THREE.UniformsUtils.clone(THREE.UniformsLib.fog);
@@ -1004,7 +1002,7 @@ export default {
     let flareGeo;
     {
       const g = flareGeo = keep(new THREE.BufferGeometry());
-      g.setAttribute('position', new THREE.BufferAttribute(flarePos, 3)); g.setAttribute('aCol', new THREE.BufferAttribute(new Float32Array([2.4, 1.5, 0.7, 0.5, 0.24, 0.08]), 3));
+      g.setAttribute('position', new THREE.BufferAttribute(flarePos, 3)); g.setAttribute('aCol', new THREE.BufferAttribute(new Float32Array([2.4, 1.5, 0.7, 0.3, 0.14, 0.05]), 3));
       g.setAttribute('aSize', new THREE.BufferAttribute(new Float32Array([26, 95]), 1)); g.setAttribute('aPh', new THREE.BufferAttribute(new Float32Array([0.2, 0.7]), 1));
       const pts = new THREE.Points(g, keep(new THREE.ShaderMaterial({ uniforms: flareU, vertexShader: GLOW_VERT, fragmentShader: GLOW_FRAG, fog: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
       pts.frustumCulled = false; pts.renderOrder = 8; scene.add(pts);
@@ -1041,7 +1039,7 @@ export default {
       list.forEach((p, i) => { iPos.set([p[0], p[1], p[2]], i * 3); iSize.set([p[3], p[4]], i * 2); iSeed[i] = R.cloud(); iKind[i] = p[5]; iTrail.set(nearTrail(p[0], p[1], p[2]), i * 2); });
       g.setAttribute('iPos', new THREE.InstancedBufferAttribute(iPos, 3)); g.setAttribute('iSize', new THREE.InstancedBufferAttribute(iSize, 2)); g.setAttribute('iSeed', new THREE.InstancedBufferAttribute(iSeed, 1));
       g.setAttribute('iTrail', new THREE.InstancedBufferAttribute(iTrail, 2)); g.setAttribute('iKind', new THREE.InstancedBufferAttribute(iKind, 1)); g.instanceCount = n;
-      const uniforms = { ...FOGU(), uTex: { value: puffTex }, uShip, uFlame, uShipQ, uStar, uAbove, uScale: { value: 1 }, uOpacity: { value: 1 }, uInside: { value: 1 }, uWarm: { value: 0.3 }, uNear: { value: 150 }, uLitR: { value: 140 }, ...extra };
+      const uniforms = { ...FOGU(), uTex: { value: puffTex }, uShip, uFlame, uShipQ, uStar, uAbove, uScale: { value: 1 }, uOpacity: { value: 1 }, uInside: { value: 1 }, uWarm: { value: 0.6 }, uNear: { value: 75 }, uLitR: { value: 80 }, ...extra };
       const mesh = new THREE.Mesh(g, keep(new THREE.ShaderMaterial({ uniforms, vertexShader: PUFF_VERT, fragmentShader: PUFF_FRAG, fog: true, transparent: true, depthWrite: false })));
       mesh.frustumCulled = false; scene.add(mesh); return { mesh, uniforms };
     }
@@ -1065,11 +1063,13 @@ export default {
       for (let i = 0, m = Math.round(2600 * D); i < m && tops.length < 760 * D; i++) {
         const a = RC() * 6.283, r = 260 + Math.pow(RC(), 1.3) * 8200, x = Math.cos(a) * r, z = -2150 + Math.sin(a) * r;
         const massif = noise.fbm2(x * 0.00042 + 5, z * 0.00042, 3); if (massif < 0.02 && RC() < 0.9) continue;      // they stand in ranges, with open deck between
-        const near = path.nearestXZ(x, z).dist, s = (150 + RC() * 330) * (1 + r * 0.00012), tall = massif > 0.22 && RC() < 0.5 ? 1.2 + RC() * 1.6 : 0.5 + RC() * 0.45;
-        if (near < 260 + s) continue;      // nothing stands in our road
-        const w = s * (tall > 1 ? 0.9 : 1.7), h = s * tall;
-        tops.push([x, CLOUD_HI - 62 + h * 0.36, z, w, h, 1]);
-        if (tall > 1) for (let k = 0; k < 3; k++) { const s2 = s * (0.5 + RC() * 0.4); tops.push([x + RC.gauss() * s * 0.5, CLOUD_HI - 62 + s2 * 0.3, z + RC.gauss() * s * 0.5, s2 * 1.6, s2 * 0.8, 1]); }      // its shoulders
+        const near = path.nearestXZ(x, z).dist, s = (150 + RC() * 300) * (1 + r * 0.00012);
+        if (near < 300 + s) continue;      // nothing stands in our road
+        if (massif > 0.2 && RC() < 0.45) {      // a tower: round billows piled on one another, each smaller, leaning a little
+          let yy = CLOUD_HI - 80, sz = s * 1.15; const lx = RC.gauss() * 0.16, lz = RC.gauss() * 0.16, nb = 3 + Math.floor(RC() * 4);
+          for (let k = 0; k < nb; k++) { tops.push([x + lx * k * sz + RC.gauss() * sz * 0.1, yy + sz * 0.36, z + lz * k * sz, sz * 1.3, sz, 1]); yy += sz * 0.46; sz *= 0.76; }
+          for (let k = 0; k < 3; k++) { const s2 = s * (0.5 + RC() * 0.4); tops.push([x + RC.gauss() * s * 0.6, CLOUD_HI - 70 + s2 * 0.3, z + RC.gauss() * s * 0.6, s2 * 1.7, s2 * 0.85, 1]); }      // its shoulders
+        } else tops.push([x, CLOUD_HI - 66 + s * 0.22, z, s * 1.8, s * (0.6 + RC() * 0.3), 1]);      // a hummock
       }
       tops.sort((p, q) => p[2] - q[2]);
       dustTop = puffField(tops, { uNear: { value: 130 } }); dustTop.mesh.renderOrder = 1;
@@ -1082,11 +1082,11 @@ export default {
     deck.rotation.x = -Math.PI / 2; deck.position.set(0, CLOUD_HI - 55, -2000); scene.add(deck);
     // motes in the murk, to show our speed
     {
-      const n = Math.round(7000 * D), a = new Float32Array(n * 3), col = new Float32Array(n * 3), size = new Float32Array(n), ph = new Float32Array(n);
-      for (let i = 0; i < n; i++) { path.pointAt(0.36 + RC() * 0.42, v3); a.set([v3.x + RC.gauss() * 45, v3.y + RC.gauss() * 45, v3.z + RC.gauss() * 45], i * 3); col.set([0.5, 0.42, 0.38], i * 3); size[i] = 0.35 + RC() * 0.3; ph[i] = RC(); }
+      const n = Math.round(4500 * D), a = new Float32Array(n * 3), col = new Float32Array(n * 3), size = new Float32Array(n), ph = new Float32Array(n);
+      for (let i = 0; i < n; i++) { path.pointAt(0.36 + RC() * 0.42, v3); a.set([v3.x + RC.gauss() * 45, v3.y + RC.gauss() * 45, v3.z + RC.gauss() * 45], i * 3); col.set([0.5, 0.42, 0.38], i * 3); size[i] = 0.5 + RC() * 0.5; ph[i] = RC(); }
       const g = keep(new THREE.BufferGeometry());
       g.setAttribute('position', new THREE.BufferAttribute(a, 3)); g.setAttribute('aCol', new THREE.BufferAttribute(col, 3)); g.setAttribute('aSize', new THREE.BufferAttribute(size, 1)); g.setAttribute('aPh', new THREE.BufferAttribute(ph, 1));
-      const pts = new THREE.Points(g, keep(new THREE.ShaderMaterial({ uniforms: { ...FOGU(), uTime, uPx, uMax: { value: 10 }, uMin: { value: 0 }, uGain: { value: 0.5 } }, vertexShader: GLOW_VERT, fragmentShader: GLOW_FRAG, fog: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
+      const pts = new THREE.Points(g, keep(new THREE.ShaderMaterial({ uniforms: { ...FOGU(), uTime, uPx, uMax: { value: 10 }, uMin: { value: 0 }, uGain: { value: 0.4 } }, vertexShader: GLOW_VERT, fragmentShader: GLOW_FRAG, fog: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
       pts.frustumCulled = false; pts.renderOrder = 5; scene.add(pts); motes = pts;
     }
     await ctx.yield();
@@ -1162,9 +1162,9 @@ export default {
       flareGeo.attributes.position.needsUpdate = true; flareU.uGain.value = fl * flick * 1.5;
       // the air: clear night below, dust in the cloud, nothing above it
       const inDust = ss(CLOUD_LO - 140, CLOUD_LO + 160, y) * (1 - ss(CLOUD_HI - 190, CLOUD_HI + 30, y)), above = ss(CLOUD_HI - 70, CLOUD_HI + 110, y);
-      scene.fog.density = lerp(lerp(0.00055, 0.0033, inDust), 0.00002, above);
+      scene.fog.density = lerp(lerp(0.00055, 0.0024, inDust), 0.00002, above);
       const near = fl / (1 + eye.distanceToSquared(shipPos) / (420 * 420));
-      fogC.copy(fogLow).lerp(fogDust, ss(CLOUD_LO - 260, CLOUD_LO + 60, y)).lerp(fogWarm, Math.min(0.7, near * 0.9) * inDust);
+      fogC.copy(fogLow).lerp(fogDust, ss(CLOUD_LO - 260, CLOUD_LO + 60, y)).lerp(fogWarm, Math.min(0.3, near * 0.5) * inDust);
       scene.fog.color.copy(fogC); scene.background.copy(fogC).multiplyScalar(inDust);
       // the stars: none at all until the top of the cloud
       const show = ss(CLOUD_HI - 120, CLOUD_HI + 200, y);
