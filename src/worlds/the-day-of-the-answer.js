@@ -876,7 +876,7 @@ export default {
       });
       // a low rail of steps before the console, and the amber pool on the floor
       for (let k = 0; k < 3; k++) box(-34 + k * 3, 34 - k * 3, k * 0.5 + 0.3, k * 0.5 + 0.8, FACE_Z + 22 - k * 3, FACE_Z + 3, darker);
-      const pool = new THREE.Mesh(keep(new THREE.CircleGeometry(60, 40)), keep(new THREE.MeshBasicMaterial({ color: new THREE.Color(0.5, 0.26, 0.07), transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending, depthWrite: false })));
+      const pool = new THREE.Mesh(keep(new THREE.CircleGeometry(60, 40)), keep(new THREE.MeshBasicMaterial({ color: new THREE.Color(0.5, 0.26, 0.07), transparent: true, opacity: 0.13, blending: THREE.AdditiveBlending, depthWrite: false })));
       pool.rotation.x = -Math.PI / 2; pool.scale.set(0.7, 1, 1); pool.position.set(0, 2.1, FACE_Z + 50); scene.add(pool);
     }
     await ctx.yield();

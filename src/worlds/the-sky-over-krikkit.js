@@ -114,38 +114,39 @@ function puffTexture(rng) {
 // ---------- shaders ----------
 const GLOW_VERT = /* glsl */`
 attribute vec3 aCol; attribute float aSize; attribute float aPh;
-uniform float uTime, uPx, uMax, fogDensity, uGain;
-varying vec3 vC;
+uniform float uTime, uPx, uMax, uMin, fogDensity, uGain;
+varying vec3 vC; varying float vS;
 void main() {
   vec4 mv = modelViewMatrix * vec4(position, 1.0); float d = max(0.5, -mv.z);
-  float raw = aSize * uPx / d;
-  gl_PointSize = clamp(raw, 2.0, uMax);
+  float raw = aSize * uPx / d, sz = min(max(raw, uMin), uMax);
+  gl_PointSize = sz; vS = smoothstep(2.5, 7.0, sz);
+  float dim = uMin > 0.5 ? clamp(raw / uMin, 0.45, 1.0) : clamp(raw / 1.3, 0.0, 1.0);      // a far lamp stays a dot; a far mote goes out
   float fl = 1.0 + 0.09 * sin(uTime * (5.0 + aPh * 7.0) + aPh * 40.0) * sin(uTime * 2.3 + aPh * 11.0);
-  vC = aCol * fl * uGain * clamp(raw / 2.0, 0.4, 1.0) * exp(-fogDensity * fogDensity * d * d);
+  vC = aCol * fl * uGain * dim * exp(-fogDensity * fogDensity * d * d);
   gl_Position = projectionMatrix * mv;
 }`;
 const GLOW_FRAG = /* glsl */`
-varying vec3 vC;
+varying vec3 vC; varying float vS;
 void main() {
   float r = length(gl_PointCoord - 0.5) * 2.0;
   float a = (exp(-r * r * 11.0) * 1.7 + exp(-r * r * 2.6) * 0.22) * smoothstep(1.0, 0.75, r);
-  gl_FragColor = vec4(vC * a, 1.0);
+  gl_FragColor = vec4(vC * mix(0.8, a, vS), 1.0);
 }`;
 const STAR_VERT = /* glsl */`
 attribute vec3 aCol; attribute float aSize;
 uniform float uPx, uShow;
-varying vec3 vC; varying float vBig;
+varying vec3 vC; varying float vBig, vS;
 void main() {
   float s = aSize * uPx;
-  gl_PointSize = max(1.6, s);
-  vC = aCol * uShow * min(1.0, s * s / 2.56 + 0.25); vBig = step(7.0, s);
+  gl_PointSize = max(1.6, s); vS = smoothstep(2.0, 5.0, s);
+  vC = aCol * uShow * min(1.0, s * s / 2.56 + 0.3); vBig = step(7.0, s);
   gl_Position = projectionMatrix * viewMatrix * vec4(cameraPosition + position, 1.0);
 }`;
 const STAR_FRAG = /* glsl */`
-varying vec3 vC; varying float vBig;
+varying vec3 vC; varying float vBig, vS;
 void main() {
   vec2 p = (gl_PointCoord - 0.5) * 2.0; float r = length(p);
-  float a = exp(-r * r * 7.0) * smoothstep(1.0, 0.6, r);
+  float a = mix(0.85, exp(-r * r * 5.0) * 1.5 * smoothstep(1.0, 0.6, r), vS);
   float sp = (exp(-abs(p.x) * 26.0) + exp(-abs(p.y) * 26.0)) * exp(-r * 3.2) * 0.9;      // the bright ones wear a cross
   a = mix(a, exp(-r * r * 60.0) * 2.4 + exp(-r * r * 9.0) * 0.35 + sp, vBig);
   gl_FragColor = vec4(vC * a, 1.0);
@@ -178,13 +179,13 @@ void main() {
   float lane2 = smoothstep(0.5, 0.72, n2) * exp(-pow(lat / (width * 0.95), 2.0)) * 0.55;
   float dark = clamp(1.0 - 0.93 * lane - lane2, 0.04, 1.0);
   vec3 cool = vec3(0.52, 0.66, 1.0), warm = vec3(1.0, 0.80, 0.56);
-  vec3 col = mix(cool, warm, clamp(centre * centre * 1.1 + bulge * 0.5, 0.0, 1.0)) * (band * 0.40 + bulge * 0.55) * dark;
-  col += vec3(1.0, 0.85, 0.7) * band * pow(n3, 3.0) * dark * 0.7;      // the grain of stars too many to draw
+  vec3 col = mix(cool, warm, clamp(centre * centre * 1.1 + bulge * 0.5, 0.0, 1.0)) * (band * 0.17 + bulge * 0.22) * dark;
+  col += vec3(1.0, 0.85, 0.7) * band * pow(n3, 3.0) * dark * 0.45;      // the grain of stars too many to draw
   // nebulae: red knots where the lanes fray, teal veils beside the band, a violet haze at high latitude
   float k1 = pow(smoothstep(0.55, 0.85, fbm(d * 5.0 + vec3(11.0, 3.0, 5.0))), 2.0) * exp(-pow(lat / (width * 1.3), 2.0));
-  col += vec3(1.0, 0.20, 0.34) * k1 * 0.6 * (0.5 + n2);
+  col += vec3(1.0, 0.20, 0.34) * k1 * 0.42 * (0.5 + n2);
   float k2 = pow(smoothstep(0.58, 0.88, fbm(d * 4.0 + vec3(2.0, 17.0, 9.0))), 2.0) * exp(-pow(lat / (width * 2.4), 2.0));
-  col += vec3(0.12, 0.50, 0.72) * k2 * 0.38;
+  col += vec3(0.12, 0.50, 0.72) * k2 * 0.26;
   float k3 = pow(smoothstep(0.60, 0.9, fbm(d * 2.6 + vec3(21.0, 7.0, 1.0))), 2.0);
   col += vec3(0.30, 0.18, 0.58) * k3 * 0.09;
   // the spiral neighbour
@@ -198,7 +199,7 @@ void main() {
     float core = exp(-r * r * 75.0) * 1.7 + exp(-r * 9.0) * 0.55;
     float knots = pow(arms, 6.0) * smoothstep(0.5, 0.8, gn) * exp(-r * 2.4);
     float dl = 1.0 - 0.65 * pow(1.0 - arms, 3.0) * smoothstep(0.1, 0.5, r);
-    col += (vec3(0.58, 0.72, 1.0) * disc * dl + vec3(1.0, 0.86, 0.62) * core + vec3(1.0, 0.28, 0.44) * knots) * smoothstep(1.7, 0.9, r);
+    col += (vec3(0.58, 0.72, 1.0) * disc * dl + vec3(1.0, 0.86, 0.62) * core + vec3(1.0, 0.28, 0.44) * knots) * 0.8 * smoothstep(1.7, 0.9, r);
   }
   // its ragged little companion
   float cz = dot(d, uC0);
@@ -223,7 +224,7 @@ void main() {
   gl_Position = projectionMatrix * mv;
 }`;
 const PUFF_FRAG = /* glsl */`
-uniform sampler2D uTex; uniform vec3 fogColor; uniform float fogDensity, uOpacity, uStar, uAbove, uNear, uInside;
+uniform sampler2D uTex; uniform vec3 fogColor; uniform float fogDensity, uOpacity, uStar, uAbove, uNear, uInside, uWarm;
 varying vec2 vUv; varying float vDepth, vLit, vKind, vSeed;
 void main() {
   vec2 uv = vUv; if (vSeed > 0.5) uv.x = 1.0 - uv.x;
@@ -231,8 +232,8 @@ void main() {
   float a = t.a * uOpacity * smoothstep(uNear * 0.2, uNear, vDepth) * clamp(vLit * 6.0 + uInside, 0.0, 1.0);
   if (a < 0.004) discard;
   vec3 dust = mix(vec3(0.020, 0.017, 0.024), vec3(0.060, 0.052, 0.066), t.r);
-  vec3 warm = vec3(1.0, 0.52, 0.20) * vLit * (0.25 + 0.75 * t.r);
-  vec3 star = vec3(0.085, 0.115, 0.19) * vKind * uStar * (0.12 + 0.88 * t.r);
+  vec3 warm = vec3(1.0, 0.50, 0.19) * vLit * uWarm * (0.2 + 0.8 * t.r);
+  vec3 star = vec3(0.060, 0.080, 0.135) * vKind * uStar * (0.06 + 0.94 * t.r * t.r);
   vec3 col = dust * (1.0 - vKind * 0.5) + warm + star;
   float f = 1.0 - exp(-fogDensity * fogDensity * vDepth * vDepth);
   col = mix(col, fogColor, f * (1.0 - vKind * uAbove));
@@ -248,7 +249,7 @@ void main() {
   vec3 wp = position;
   vec3 side = normalize(cross(aTan, normalize(cameraPosition - wp)));
   float age = max(0.0, uShipQ - aQ);
-  float w = (1.1 + 46.0 * pow(age, 0.8)) * (0.8 + 0.3 * sin(aQ * 310.0) * sin(aQ * 97.0 + 1.0));
+  float w = (1.1 + 24.0 * pow(age, 0.8)) * (0.8 + 0.3 * sin(aQ * 310.0) * sin(aQ * 97.0 + 1.0));
   wp += side * aSide * w;
   vec4 mv = viewMatrix * vec4(wp, 1.0);
   vSide = aSide; vAge = age; vQ = aQ; vFog = exp(-fogDensity * fogDensity * mv.z * mv.z * 0.35);
@@ -259,12 +260,12 @@ uniform float uShipQ, uFlame;
 varying float vSide, vAge, vFog, vQ;
 void main() {
   if (vQ > uShipQ) discard;
-  float x = abs(vSide), w = 1.1 + 46.0 * pow(vAge, 0.8);
+  float x = abs(vSide), w = 1.1 + 24.0 * pow(vAge, 0.8);
   float core = exp(-x * x * w * w * 0.5);                 // a hot thread about a metre wide whatever the smoke has spread to
   float hot = exp(-vAge * 26.0);
   vec3 col = vec3(1.0, 0.93, 0.80) * core * (0.55 + 3.2 * hot * uFlame);
-  col += vec3(1.0, 0.50, 0.16) * exp(-x * x * 5.0) * exp(-vAge * 7.0) * 0.55 * uFlame;
-  col += vec3(0.30, 0.25, 0.24) * exp(-x * x * 3.0) * (1.0 - x) * 0.10 * smoothstep(0.0, 0.02, vAge);      // the smoke it leaves, lit by its own thread
+  col += vec3(1.0, 0.50, 0.16) * exp(-x * x * 5.0) * exp(-vAge * 9.0) * 0.3 * uFlame;
+  col += vec3(0.30, 0.25, 0.24) * exp(-x * x * 3.0) * (1.0 - x) * 0.045 * smoothstep(0.0, 0.02, vAge);      // the smoke it leaves, lit by its own thread
   gl_FragColor = vec4(col * vFog, 1.0);
 }`;
 const WATER_VERT = /* glsl */`
@@ -295,12 +296,15 @@ const DECK_VERT = /* glsl */`
 varying vec3 vW; varying float vDepth;
 void main() { vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; vec4 mv = viewMatrix * w; vDepth = length(mv.xyz); gl_Position = projectionMatrix * mv; }`;
 const DECK_FRAG = /* glsl */`
-uniform float uStar; varying vec3 vW; varying float vDepth;
+uniform float uStar; uniform vec2 uLdir; varying vec3 vW; varying float vDepth;
 ${GLSL_N3}
+float H(vec2 p) { return fbm(vec3(p * 0.0009, 1.0)) * 0.60 + fbm(vec3(p * 0.0037 + 9.0, 4.0)) * 0.30 + vnoise(vec3(p * 0.015, 2.0)) * 0.10; }
 void main() {
-  float n = fbm(vec3(vW.xz * 0.0011, 1.0)), m = fbm(vec3(vW.xz * 0.0041 + 9.0, 4.0));
-  vec3 col = mix(vec3(0.006, 0.008, 0.014), vec3(0.045, 0.058, 0.095), smoothstep(0.32, 0.78, n * 0.7 + m * 0.3)) * uStar;
-  col = mix(col, vec3(0.012, 0.016, 0.03) * uStar, 1.0 - exp(-vDepth * 0.00016));
+  vec2 p = vW.xz; float h = H(p), h2 = H(p + uLdir * 150.0);
+  float sh = clamp(0.5 + (h2 - h) * -7.0, 0.0, 1.0), crest = smoothstep(0.34, 0.72, h);      // the slopes that face the galaxy's heart take its light
+  vec3 col = mix(vec3(0.003, 0.004, 0.008), vec3(0.036, 0.048, 0.082), crest * 0.45 + sh * 0.6 * (0.3 + crest)) * uStar;
+  col += vec3(0.030, 0.022, 0.012) * sh * crest * uStar;
+  col = mix(col, vec3(0.010, 0.014, 0.027) * uStar, 1.0 - exp(-vDepth * 0.00014));
   gl_FragColor = vec4(col, 1.0);
 }`;
 
@@ -318,10 +322,11 @@ export default {
     const noise = makeNoise(Math.floor(rng() * 1e9));
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#000000');
-    const fogLow = new THREE.Color(0.006, 0.010, 0.018), fogDust = new THREE.Color(0.030, 0.026, 0.036), fogWarm = new THREE.Color(0.30, 0.15, 0.06);
+    const fogLow = new THREE.Color(0.006, 0.010, 0.018), fogDust = new THREE.Color(0.030, 0.026, 0.036), fogWarm = new THREE.Color(0.115, 0.055, 0.022);
     scene.fog = new THREE.FogExp2(fogLow.clone(), 0.00055);
     const trash = []; const keep = (o) => { trash.push(o); return o; };
     const FOGU = () => THREE.UniformsUtils.clone(THREE.UniformsLib.fog);
+    const SKY_BU = new THREE.Vector3(-0.24, 0.40, -0.88).normalize();      // toward the galaxy's heart: ahead of us, a hand above the cloud
     const uTime = { value: 0 }, uPx = { value: 450 }, uShip = { value: new THREE.Vector3() }, uFlame = { value: 0 }, uShipQ = { value: 0 }, uStar = { value: 0 }, uAbove = { value: 0 };
 
     // =====================================================================================================
@@ -336,6 +341,7 @@ export default {
       let h = 9 + noise.fbm2(x * 0.0015, z * 0.0015, 4) * 17 * (0.4 + 0.6 * ss(180, 800, dv)) + noise.fbm2(x * 0.009 + 7, z * 0.009 - 3, 3) * 1.6;
       const dh = Math.hypot(x - HILL[0], z - HILL[1]);
       h += HILL_H * Math.exp(-Math.pow(Math.max(0, dh - 34) / HILL_R, 2)) * (1 + 0.09 * noise.n2(x * 0.004 + 2, z * 0.004) * ss(40, 160, dh));
+      if (dh < 520) h += (3.2 * noise.fbm2(x * 0.017 + 4, z * 0.017, 3) + 1.3 * Math.sin(h * 0.42)) * ss(44, 130, dh) * (1 - ss(300, 520, dh));      // gullies, and the old plough terraces round it
       const dk = Math.hypot(x - KNOLL[0], z - KNOLL[1]); h += KNOLL_H * Math.exp(-(dk * dk) / (KNOLL_R * KNOLL_R));
       const r = Math.hypot(x, z + 500);
       if (r > 1400) h += ss(1400, 3600, r) * (120 + 130 * noise.ridged2(x * 0.0006 + 4, z * 0.0006 + 1, 4));
@@ -371,7 +377,7 @@ export default {
     }
     const shipQ = (u) => {
       if (!(u > U_L)) return 0;
-      if (u < U_J) { const t = (u - U_L) / (U_J - U_L); return Q1 * t * t * (0.55 + 0.45 * t); }
+      if (u < U_J) { const t = (u - U_L) / (U_J - U_L); return Q1 * Math.pow(t, 1.8); }
       if (u < U_E) return Q1 + (1 - Q1) * (u - U_J) / (U_E - U_J);
       return 1;
     };
@@ -690,6 +696,14 @@ export default {
       winM.push(M(GX + 15, PAD_Y + 2.0, GZ - 8.9, 4.2, 3.6, 0.1)); winC.push(2.4, 1.5, 0.6); stamp(GX + 15, GZ - 3, 10, WARM, 1.2);      // the workshop door stands open
       for (let b = 0; b < 5; b++) glow(GX, PAD_Y + 6.5 + b * 6.2, GZ + 2.4, AMBER, 1.3, 1.5);      // work lamps up the gantry
       stamp(PAD[0], PAD[1], 26, AMBER, 0.9);
+      // strings of little lights from the gantry's head down to a ring of poles: it is the biggest night the village has had
+      const BCOL = [CANDLE, [1.0, 0.35, 0.25], CANDLE, [0.45, 0.8, 1.0], CANDLE, [0.55, 1.0, 0.5]];
+      for (let i = 0; i < 7; i++) {
+        const a = i / 7 * 6.283 + 0.45, ex = PAD[0] + Math.cos(a) * 31, ez = PAD[1] + Math.sin(a) * 31, ey = height(ex, ez) + 7;
+        poleM.push(M(ex, ey - 3.5, ez, 0.2, 7, 0.2));
+        if (Math.abs(ex - GX) < 8 && ez > GZ) continue;
+        for (let j = 1; j < 26; j++) { const t = j / 26; glow(lerp(GX, ex, t), lerp(PAD_Y + 31, ey, t) - 5 * Math.sin(t * Math.PI), lerp(GZ, ez, t), BCOL[(i + j) % BCOL.length], 0.7, 1.8); }
+      }
       // a rope ring keeps the crowd back: posts, every third with a lantern
       for (let i = 0; i < 40; i++) { const a = i / 40 * 6.283, x = PAD[0] + Math.cos(a) * 36, z = PAD[1] + Math.sin(a) * 36; postM.push(M(x, height(x, z) + 0.7, z, 0.12, 1.4, 0.12)); if (i % 3 === 0) lamp(x, height(x, z) + 1.6, z, AMBER, 1.5, 6, 0.9); }
     }
@@ -734,34 +748,66 @@ export default {
     // =====================================================================================================
     // THE LAND ITSELF
     // =====================================================================================================
-    const fieldOf = (x, z) => {      // a patchwork of fields: which one, and how near its hedge
+    const fieldOf = (x, z) => {      // a patchwork of fields: which one, how near its hedge, and where in it
       const wx = x + 40 * noise.n2(x * 0.002, z * 0.002), wz = z + 40 * noise.n2(x * 0.002 + 9, z * 0.002);
       const u = (wx * 0.8 + wz * 0.6) / 96, v = (-wx * 0.6 + wz * 0.8) / 74, iu = Math.floor(u), iv = Math.floor(v);
       const hsh = Math.abs(Math.sin(iu * 127.1 + iv * 311.7) * 43758.5453) % 1;
-      return { kind: hsh, edge: Math.min(u - iu, 1 - u + iu, v - iv, 1 - v + iv) };
+      return { kind: hsh, edge: Math.min((u - iu) * 96, (1 - u + iu) * 96, (v - iv) * 74, (1 - v + iv) * 74), u, v, dir: (hsh * 7.3) % 1 > 0.5 };
     };
-    const landColour = (x, z, y, out) => {
+    // the land's own colour at a point. fine: with what only the painted map can hold (crop rows, grain, thin hedges, tracks)
+    const landColour = (x, z, y, out, fine) => {
       const n = 0.5 + 0.5 * noise.fbm2(x * 0.006 + 9, z * 0.006 - 4, 3), f = fieldOf(x, z);
-      let r = 0.075 + 0.04 * n, g = 0.165 + 0.085 * n, b = 0.135 + 0.05 * n;      // meadow
-      if (f.kind < 0.22) { r = 0.12; g = 0.10; b = 0.085; }                       // plough
-      else if (f.kind < 0.40) { r = 0.17; g = 0.16; b = 0.085; }                   // stubble
-      else if (f.kind < 0.56) { r = 0.05; g = 0.15; b = 0.10; }                    // a dark crop
-      if (f.edge < 0.07) { r *= 0.45; g *= 0.55; b *= 0.5; }                       // the hedge's line
-      const dh = Math.hypot(x - HILL[0], z - HILL[1]), hill = 1 - ss(150, 300, dh);
-      r = lerp(r, 0.085 + 0.03 * n, hill); g = lerp(g, 0.15 + 0.06 * n, hill); b = lerp(b, 0.12 + 0.04 * n, hill);      // the hill is rough grass
-      const dg = Math.hypot(x - GREEN[0], z - GREEN[1]); if (dg < GREEN_R + 6) { const m = 1 - ss(GREEN_R, GREEN_R + 6, dg); r = lerp(r, 0.07, m); g = lerp(g, 0.24, m); b = lerp(b, 0.13, m);
-        if (Math.abs(x - GREEN[0]) < 1.6 && Math.abs(z - GREEN[1] - 14) < 11) { r = 0.3; g = 0.32; b = 0.2; } }      // a mown strip on the green
-      const rd = riverDist(x, z); if (rd < 30) { const m = 1 - ss(12, 30, rd); r = lerp(r, 0.05, m); g = lerp(g, 0.09, m); b = lerp(b, 0.075, m); }
-      const dp = Math.hypot(x - PAD[0], z - PAD[1]); if (dp < 34) { const m = 1 - ss(10, 34, dp); r = lerp(r, 0.09, m); g = lerp(g, 0.075, m); b = lerp(b, 0.06, m); }      // trodden and scorched
+      let r = 0.066 + 0.034 * n, g = 0.142 + 0.07 * n, b = 0.080 + 0.03 * n, rows = 0;      // meadow
+      if (f.kind < 0.22) { r = 0.105; g = 0.086; b = 0.064; rows = 1; }                    // plough
+      else if (f.kind < 0.40) { r = 0.155; g = 0.142; b = 0.072; rows = 0.5; }             // stubble
+      else if (f.kind < 0.56) { r = 0.042; g = 0.125; b = 0.068; rows = 0.8; }             // a dark crop
+      else if (f.kind > 0.88) { r = 0.09; g = 0.165; b = 0.07; rows = 0.25; }              // hay, mown in swathes
+      if (fine) {
+        if (rows) { const k = 1 + 0.24 * rows * Math.sin((f.dir ? f.u * 96 : f.v * 74) * 6.2832 / 5.6); r *= k; g *= k; b *= k; }
+        const gr = 1 + 0.17 * noise.n2(x * 0.31, z * 0.31) + 0.13 * noise.n2(x * 0.07 + 3, z * 0.07); r *= gr; g *= gr; b *= gr;
+        if (f.edge < 2.4) { const m = 1 - ss(1.2, 2.4, f.edge); r = lerp(r, 0.018, m); g = lerp(g, 0.042, m); b = lerp(b, 0.028, m); }      // the hedge
+        else if (f.edge < 4.5) { r *= 1.12; g *= 1.08; }      // the headland, left rough
+      } else if (f.edge < 6) { r *= 0.5; g *= 0.6; b *= 0.55; }
+      const dh = Math.hypot(x - HILL[0], z - HILL[1]), hill = 1 - ss(170, 300, dh);
+      if (hill > 0) {      // the hill is rough grass, bracken in its hollows, grey rock showing through, sheep tracks along its contours
+        let hr = 0.082 + 0.03 * n, hg = 0.125 + 0.05 * n, hb = 0.066 + 0.025 * n;
+        if (fine) {
+          const br = noise.fbm2(x * 0.011 + 31, z * 0.011, 3), rk = noise.ridged2(x * 0.02 + 5, z * 0.02, 3), gr = 1 + 0.2 * noise.n2(x * 0.3, z * 0.3);
+          if (br > 0.12) { const m = ss(0.12, 0.3, br); hr = lerp(hr, 0.105, m); hg = lerp(hg, 0.082, m); hb = lerp(hb, 0.045, m); }
+          if (rk > 0.62) { const m = ss(0.62, 0.72, rk); hr = lerp(hr, 0.15, m); hg = lerp(hg, 0.15, m); hb = lerp(hb, 0.15, m); }
+          const tr = Math.sin(dh * 0.55 + 4 * noise.n2(x * 0.01, z * 0.01)); if (tr > 0.9) { hr *= 1.3; hg *= 1.22; hb *= 1.1; }
+          hr *= gr; hg *= gr; hb *= gr;
+        }
+        r = lerp(r, hr, hill); g = lerp(g, hg, hill); b = lerp(b, hb, hill);
+      }
+      const dg = Math.hypot(x - GREEN[0], z - GREEN[1]);
+      if (dg < GREEN_R + 6) { const m = 1 - ss(GREEN_R, GREEN_R + 6, dg), mow = fine ? 1 + 0.1 * Math.sign(Math.sin(x * 0.9)) : 1; r = lerp(r, 0.06 * mow, m); g = lerp(g, 0.21 * mow, m); b = lerp(b, 0.10 * mow, m);
+        if (Math.abs(x - GREEN[0]) < 1.6 && Math.abs(z - GREEN[1] - 14) < 11) { r = 0.3; g = 0.31; b = 0.19; }      // the pitch, rolled pale
+        if (fine && Math.abs(dg - 38) < 0.5) { r = 0.4; g = 0.42; b = 0.36; } }      // and its boundary, chalked
+      const rd = riverDist(x, z); if (rd < 30) { const m = 1 - ss(13, 30, rd); r = lerp(r, 0.05, m); g = lerp(g, 0.085, m); b = lerp(b, 0.06, m); }      // reeds and mud
+      const dp = Math.hypot(x - PAD[0], z - PAD[1]); if (dp < 40) { const m = 1 - ss(10, 40, dp); r = lerp(r, 0.085, m); g = lerp(g, 0.07, m); b = lerp(b, 0.055, m); }      // trodden and scorched
       if (y > 150) { const m = ss(150, 300, y); r = lerp(r, 0.10, m); g = lerp(g, 0.11, m); b = lerp(b, 0.12, m); }
       out[0] = r; out[1] = g; out[2] = b;
     };
-    function gridGeo(x0, z0, w, d, nx, nz, drop) {
+    // the fine patch's colours go into one painted map (a vertex every few metres could not hold a hedge or a furrow)
+    const ATEX = D < 0.7 ? 2.0 : 1.4, ANX = Math.round(LW / ATEX), ANZ = Math.round(LD / ATEX);
+    let landTex;
+    {
+      const data = new Uint8Array(ANX * ANZ * 4), c = [0, 0, 0], enc = (v) => Math.min(255, Math.round(255 * Math.pow(Math.max(0, v), 1 / 2.2)));
+      for (let j = 0; j < ANZ; j++) {
+        const z = LZ0 + (j + 0.5) * ATEX;
+        for (let i = 0; i < ANX; i++) { landColour(LX0 + (i + 0.5) * ATEX, z, 0, c, true); const o = (j * ANX + i) * 4; data[o] = enc(c[0]); data[o + 1] = enc(c[1]); data[o + 2] = enc(c[2]); data[o + 3] = 255; }
+        if (j % 60 === 59) await ctx.yield();
+      }
+      landTex = keep(new THREE.DataTexture(data, ANX, ANZ, THREE.RGBAFormat, THREE.UnsignedByteType));
+      landTex.colorSpace = THREE.SRGBColorSpace; landTex.magFilter = THREE.LinearFilter; landTex.minFilter = THREE.LinearMipmapLinearFilter; landTex.generateMipmaps = true; landTex.anisotropy = 4; landTex.needsUpdate = true;
+    }
+    function gridGeo(x0, z0, w, d, nx, nz, drop, white) {
       const pos = new Float32Array((nx + 1) * (nz + 1) * 3), col = new Float32Array(pos.length), uv = new Float32Array((nx + 1) * (nz + 1) * 2), c = [0, 0, 0];
       for (let j = 0, o = 0; j <= nz; j++) for (let i = 0; i <= nx; i++, o++) {
         const x = x0 + w * i / nx, z = z0 + d * j / nz, y = height(x, z);
         pos[o * 3] = x; pos[o * 3 + 1] = y - (drop ? drop(x, z) : 0); pos[o * 3 + 2] = z;
-        landColour(x, z, y, c); col[o * 3] = c[0]; col[o * 3 + 1] = c[1]; col[o * 3 + 2] = c[2];
+        if (white) c[0] = c[1] = c[2] = 1; else landColour(x, z, y, c, false); col[o * 3] = c[0]; col[o * 3 + 1] = c[1]; col[o * 3 + 2] = c[2];
         uv[o * 2] = (x - LX0) / LW; uv[o * 2 + 1] = (z - LZ0) / LD;
       }
       const idx = new Uint32Array(nx * nz * 6); let k = 0;
@@ -773,7 +819,7 @@ export default {
     }
     {
       const cell = D < 0.7 ? 6 : 4;
-      const inner = new THREE.Mesh(keep(gridGeo(LX0, LZ0, LW, LD, Math.round(LW / cell), Math.round(LD / cell))), keep(new THREE.MeshLambertMaterial({ vertexColors: true, lightMap: lampTex, lightMapIntensity: LAMP_GAIN })));
+      const inner = new THREE.Mesh(keep(gridGeo(LX0, LZ0, LW, LD, Math.round(LW / cell), Math.round(LD / cell), null, true)), keep(new THREE.MeshLambertMaterial({ map: landTex, lightMap: lampTex, lightMapIntensity: LAMP_GAIN })));
       scene.add(inner);
       await ctx.yield();
       // the country round it: coarse, sunk a little under the fine patch so the two never fight
@@ -811,7 +857,7 @@ export default {
     for (let kind = 0; kind < 4; kind++) {
       const list = houses.filter((h) => h.kind === kind);
       const mats = list.map((h) => new THREE.Matrix4().compose(_p.set(h.x, h.y, h.z), _q.setFromAxisAngle(_up, h.ry), _s.setScalar(h.sc)).clone());
-      instances(houseGeo[kind], lit, mats, (m, i) => { const h = list[i], f = h.W(0, 0, h.k.d / 2 + 2.5); return tintAt(f[0], f[2], 0.9 + 0.2 * ((i * 7) % 5) / 5, 2.6); });
+      instances(houseGeo[kind], lit, mats, (m, i) => { const h = list[i], f = h.W(0, 0, h.k.d / 2 + 2.5); return tintAt(f[0], f[2], 0.86 + 0.2 * ((i * 7) % 5) / 5, 2.0); });
     }
     // windows: bright panes, each its own shade of lamplight
     { const im = instances(BOX, keep(new THREE.MeshBasicMaterial({ color: 0xffffff })), winM, null); for (let i = 0; i < winM.length; i++) im.setColorAt(i, _c.setRGB(winC[i * 3], winC[i * 3 + 1], winC[i * 3 + 2])); }
@@ -839,7 +885,32 @@ export default {
         if (f.kind < 0.22 || f.kind > 0.4 || f.edge < 0.12 || riverDist(x, z) < 30 || laneDist(x, z) < 8 || houses.some((h) => Math.hypot(h.x - x, h.z - z) < h.r + 4)) continue;
         const s = 0.8 + R.misc() * 0.5; mats.push(M(x, height(x, z) - 0.1, z, s, s, s, R.misc() * 6));
       }
-      instances(keep(new THREE.LatheGeometry(prof, 10)), keep(new THREE.MeshLambertMaterial({ color: '#9a8246' })), mats, tintOfMatrix(1, 3));
+      instances(keep(new THREE.LatheGeometry(prof, 10)), keep(new THREE.MeshLambertMaterial({ color: '#6f6038' })), mats, tintOfMatrix(1, 3));
+    }
+    // the hill's furniture: grey rocks, gorse, a dry-stone wall round its foot with a gap where the path goes through
+    {
+      const RM = R.misc, rock = new THREE.IcosahedronGeometry(1, 0), rp = rock.attributes.position;
+      for (let i = 0; i < rp.count; i++) { const k = 0.75 + 0.5 * Math.abs(Math.sin(rp.getX(i) * 9.1 + rp.getY(i) * 5.3 + rp.getZ(i) * 7.7)); rp.setXYZ(i, rp.getX(i) * k, rp.getY(i) * k * 0.7, rp.getZ(i) * k); }
+      rock.computeVertexNormals(); keep(rock);
+      const rocks = [], gorse = [], wall = [];
+      for (let i = 0; i < 900 && rocks.length < 260; i++) {
+        const a = RM() * 6.283, r = 46 + RM() * 250, x = HILL[0] + Math.cos(a) * r, z = HILL[1] + Math.sin(a) * r;
+        if (noise.ridged2(x * 0.02 + 5, z * 0.02, 3) < 0.6 || laneDist(x, z) < 5) continue;
+        const s = 0.7 + RM() * RM() * 3.2; rocks.push(M(x, height(x, z) + s * 0.15, z, s * (0.8 + RM() * 0.6), s, s * (0.8 + RM() * 0.6), RM() * 6.283, (RM() - 0.5) * 0.5));
+      }
+      for (let i = 0; i < 2600 && gorse.length < 620; i++) {
+        const a = RM() * 6.283, r = 60 + RM() * 250, x = HILL[0] + Math.cos(a) * r, z = HILL[1] + Math.sin(a) * r;
+        if (noise.fbm2(x * 0.011 + 31, z * 0.011, 3) < 0.1 || laneDist(x, z) < 5) continue;
+        const s = 0.8 + RM() * 1.3; gorse.push(M(x, height(x, z) + s * 0.25, z, s * 1.4, s * 0.8, s * 1.4, RM() * 6.283));
+      }
+      for (let i = 0; i < 470; i++) {
+        const a = i / 470 * 6.283, r = 212 + 14 * Math.sin(a * 3 + 1) + 5 * Math.sin(a * 11), x = HILL[0] + Math.cos(a) * r, z = HILL[1] + Math.sin(a) * r;
+        if (laneDist(x, z) < 4.5) continue;
+        wall.push(M(x, height(x, z) + 0.5, z, 0.7, 1.15 + 0.2 * Math.sin(i * 7.3), 3.0, -a));
+      }
+      instances(rock, keep(new THREE.MeshLambertMaterial({ color: '#77756f', flatShading: true })), rocks, tintOfMatrix(1, 3));
+      instances(keep(new THREE.IcosahedronGeometry(1, 1)), keep(new THREE.MeshLambertMaterial({ color: '#1d3a1f', flatShading: true })), gorse, tintOfMatrix(1, 3));
+      instances(BOX, keep(new THREE.MeshLambertMaterial({ color: '#6d6a63' })), wall, tintOfMatrix(1, 3));
     }
     // trees: a broadleaf, a poplar, a willow, a fir
     {
@@ -885,7 +956,7 @@ export default {
     const fire = new THREE.PointLight(new THREE.Color(1.0, 0.62, 0.3), 0, 0, 2); scene.add(fire);
 
     // ---- all the small lights, in one draw ----
-    const glowU = { ...FOGU(), uTime, uPx, uMax: { value: 72 }, uGain: { value: 1 } };
+    const glowU = { ...FOGU(), uTime, uPx, uMax: { value: 72 }, uMin: { value: 2 }, uGain: { value: 1 } };
     {
       const n = glowList.length / 8, pos = new Float32Array(n * 3), col = new Float32Array(n * 3), size = new Float32Array(n), ph = new Float32Array(n);
       for (let i = 0; i < n; i++) { pos.set(glowList.slice(i * 8, i * 8 + 3), i * 3); col.set(glowList.slice(i * 8 + 3, i * 8 + 6), i * 3); size[i] = glowList[i * 8 + 6]; ph[i] = glowList[i * 8 + 7]; }
@@ -928,13 +999,13 @@ export default {
       fl2.rotation.x = Math.PI; fl2.position.y = -1.6; flame.add(fl2);
     }
     // the fire's own glare: one big soft point that goes with the ship
-    const flareU = { ...FOGU(), uTime, uPx, uMax: { value: 700 }, uGain: { value: 0 } };
+    const flareU = { ...FOGU(), uTime, uPx, uMax: { value: 700 }, uMin: { value: 2 }, uGain: { value: 0 } };
     const flarePos = new Float32Array(6);
     let flareGeo;
     {
       const g = flareGeo = keep(new THREE.BufferGeometry());
-      g.setAttribute('position', new THREE.BufferAttribute(flarePos, 3)); g.setAttribute('aCol', new THREE.BufferAttribute(new Float32Array([2.4, 1.5, 0.7, 0.9, 0.42, 0.14]), 3));
-      g.setAttribute('aSize', new THREE.BufferAttribute(new Float32Array([26, 130]), 1)); g.setAttribute('aPh', new THREE.BufferAttribute(new Float32Array([0.2, 0.7]), 1));
+      g.setAttribute('position', new THREE.BufferAttribute(flarePos, 3)); g.setAttribute('aCol', new THREE.BufferAttribute(new Float32Array([2.4, 1.5, 0.7, 0.5, 0.24, 0.08]), 3));
+      g.setAttribute('aSize', new THREE.BufferAttribute(new Float32Array([26, 95]), 1)); g.setAttribute('aPh', new THREE.BufferAttribute(new Float32Array([0.2, 0.7]), 1));
       const pts = new THREE.Points(g, keep(new THREE.ShaderMaterial({ uniforms: flareU, vertexShader: GLOW_VERT, fragmentShader: GLOW_FRAG, fog: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
       pts.frustumCulled = false; pts.renderOrder = 8; scene.add(pts);
     }
@@ -970,12 +1041,12 @@ export default {
       list.forEach((p, i) => { iPos.set([p[0], p[1], p[2]], i * 3); iSize.set([p[3], p[4]], i * 2); iSeed[i] = R.cloud(); iKind[i] = p[5]; iTrail.set(nearTrail(p[0], p[1], p[2]), i * 2); });
       g.setAttribute('iPos', new THREE.InstancedBufferAttribute(iPos, 3)); g.setAttribute('iSize', new THREE.InstancedBufferAttribute(iSize, 2)); g.setAttribute('iSeed', new THREE.InstancedBufferAttribute(iSeed, 1));
       g.setAttribute('iTrail', new THREE.InstancedBufferAttribute(iTrail, 2)); g.setAttribute('iKind', new THREE.InstancedBufferAttribute(iKind, 1)); g.instanceCount = n;
-      const uniforms = { ...FOGU(), uTex: { value: puffTex }, uShip, uFlame, uShipQ, uStar, uAbove, uScale: { value: 1 }, uOpacity: { value: 1 }, uInside: { value: 1 }, uNear: { value: 150 }, uLitR: { value: 190 }, ...extra };
+      const uniforms = { ...FOGU(), uTex: { value: puffTex }, uShip, uFlame, uShipQ, uStar, uAbove, uScale: { value: 1 }, uOpacity: { value: 1 }, uInside: { value: 1 }, uWarm: { value: 0.3 }, uNear: { value: 150 }, uLitR: { value: 140 }, ...extra };
       const mesh = new THREE.Mesh(g, keep(new THREE.ShaderMaterial({ uniforms, vertexShader: PUFF_VERT, fragmentShader: PUFF_FRAG, fog: true, transparent: true, depthWrite: false })));
       mesh.frustumCulled = false; scene.add(mesh); return { mesh, uniforms };
     }
     const RC = R.cloud, v3 = new THREE.Vector3();
-    let dustIn, dustTop, padSmoke;
+    let dustIn, dustTop, padSmoke, motes;
     {
       // inside: billows all about the road through the layer, far ones first (we look up the road)
       const list = [], n = Math.round(1150 * D);
@@ -991,21 +1062,23 @@ export default {
       dustIn = puffField(list, {}); dustIn.mesh.renderOrder = 2;
       // the top: a country of dark billows under the stars, with towers standing out of it
       const tops = [];
-      for (let i = 0, m = Math.round(900 * D); i < m; i++) {
-        const a = RC() * 6.283, r = 150 + Math.pow(RC(), 1.25) * 9000, x = Math.cos(a) * r, z = -2100 + Math.sin(a) * r;
-        const tower = noise.fbm2(x * 0.0005 + 5, z * 0.0005, 3), s = 420 + RC() * 700 + r * 0.05;
-        const up = (tower > 0.25 ? (tower - 0.25) * 620 * RC() : 0);
-        if (Math.hypot(x, z + 2100) < 700 && up > 150) continue;      // nothing tall right on our road
-        tops.push([x, CLOUD_HI - 30 + s * 0.12 + up, z, s * 1.5, s * (0.45 + RC() * 0.3) + up * 0.5, 1]);
+      for (let i = 0, m = Math.round(2600 * D); i < m && tops.length < 760 * D; i++) {
+        const a = RC() * 6.283, r = 260 + Math.pow(RC(), 1.3) * 8200, x = Math.cos(a) * r, z = -2150 + Math.sin(a) * r;
+        const massif = noise.fbm2(x * 0.00042 + 5, z * 0.00042, 3); if (massif < 0.02 && RC() < 0.9) continue;      // they stand in ranges, with open deck between
+        const near = path.nearestXZ(x, z).dist, s = (150 + RC() * 330) * (1 + r * 0.00012), tall = massif > 0.22 && RC() < 0.5 ? 1.2 + RC() * 1.6 : 0.5 + RC() * 0.45;
+        if (near < 260 + s) continue;      // nothing stands in our road
+        const w = s * (tall > 1 ? 0.9 : 1.7), h = s * tall;
+        tops.push([x, CLOUD_HI - 62 + h * 0.36, z, w, h, 1]);
+        if (tall > 1) for (let k = 0; k < 3; k++) { const s2 = s * (0.5 + RC() * 0.4); tops.push([x + RC.gauss() * s * 0.5, CLOUD_HI - 62 + s2 * 0.3, z + RC.gauss() * s * 0.5, s2 * 1.6, s2 * 0.8, 1]); }      // its shoulders
       }
       tops.sort((p, q) => p[2] - q[2]);
-      dustTop = puffField(tops, { uNear: { value: 60 } }); dustTop.mesh.renderOrder = 1;
+      dustTop = puffField(tops, { uNear: { value: 130 } }); dustTop.mesh.renderOrder = 1;
       // the pad's own smoke: it grows from the moment she lights
-      const sm = []; for (let i = 0; i < 46; i++) { const a = RC() * 6.283, r = 3 + RC() * 20; sm.push([PAD[0] + Math.cos(a) * r, PAD_Y + 2 + RC() * 7 + r * 0.25, PAD[1] + Math.sin(a) * r, 16 + RC() * 14, 12 + RC() * 9, 0]); }
-      padSmoke = puffField(sm, { uNear: { value: 18 }, uLitR: { value: 70 } }); padSmoke.mesh.renderOrder = 3;
+      const sm = []; for (let i = 0; i < 54; i++) { const a = RC() * 6.283, r = 3 + RC() * 22; sm.push([PAD[0] + Math.cos(a) * r, PAD_Y + 1.5 + RC() * 3.5 + r * 0.08, PAD[1] + Math.sin(a) * r, 13 + RC() * 10, 7 + RC() * 6, 0]); }
+      padSmoke = puffField(sm, { uNear: { value: 18 }, uLitR: { value: 60 }, uWarm: { value: 0.55 } }); padSmoke.mesh.renderOrder = 3;
     }
     // the deck under the billows: seen only from above (its face is up); it hides the land for good
-    const deck = new THREE.Mesh(keep(new THREE.CircleGeometry(30000, 64)), keep(new THREE.ShaderMaterial({ uniforms: { uStar }, vertexShader: DECK_VERT, fragmentShader: DECK_FRAG })));
+    const deck = new THREE.Mesh(keep(new THREE.CircleGeometry(30000, 64)), keep(new THREE.ShaderMaterial({ uniforms: { uStar, uLdir: { value: new THREE.Vector2(SKY_BU.x, SKY_BU.z).normalize() } }, vertexShader: DECK_VERT, fragmentShader: DECK_FRAG })));
     deck.rotation.x = -Math.PI / 2; deck.position.set(0, CLOUD_HI - 55, -2000); scene.add(deck);
     // motes in the murk, to show our speed
     {
@@ -1013,8 +1086,8 @@ export default {
       for (let i = 0; i < n; i++) { path.pointAt(0.36 + RC() * 0.42, v3); a.set([v3.x + RC.gauss() * 45, v3.y + RC.gauss() * 45, v3.z + RC.gauss() * 45], i * 3); col.set([0.5, 0.42, 0.38], i * 3); size[i] = 0.35 + RC() * 0.3; ph[i] = RC(); }
       const g = keep(new THREE.BufferGeometry());
       g.setAttribute('position', new THREE.BufferAttribute(a, 3)); g.setAttribute('aCol', new THREE.BufferAttribute(col, 3)); g.setAttribute('aSize', new THREE.BufferAttribute(size, 1)); g.setAttribute('aPh', new THREE.BufferAttribute(ph, 1));
-      const pts = new THREE.Points(g, keep(new THREE.ShaderMaterial({ uniforms: { ...FOGU(), uTime, uPx, uMax: { value: 10 }, uGain: { value: 0.5 } }, vertexShader: GLOW_VERT, fragmentShader: GLOW_FRAG, fog: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
-      pts.frustumCulled = false; pts.renderOrder = 5; scene.add(pts);
+      const pts = new THREE.Points(g, keep(new THREE.ShaderMaterial({ uniforms: { ...FOGU(), uTime, uPx, uMax: { value: 10 }, uMin: { value: 0 }, uGain: { value: 0.5 } }, vertexShader: GLOW_VERT, fragmentShader: GLOW_FRAG, fog: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
+      pts.frustumCulled = false; pts.renderOrder = 5; scene.add(pts); motes = pts;
     }
     await ctx.yield();
 
@@ -1025,7 +1098,7 @@ export default {
     const uShow = { value: 0 }, uPxS = { value: 1 };
     {
       const RST = R.stars, SR = 14000;
-      const bu = new THREE.Vector3(-0.24, 0.40, -0.88).normalize();                 // toward the galaxy's heart: ahead of us, a hand above the cloud
+      const bu = SKY_BU;
       const pole = new THREE.Vector3().crossVectors(bu, new THREE.Vector3(0.80, 0.55, 0.22).normalize()).normalize();
       const bv = new THREE.Vector3().crossVectors(pole, bu).normalize();
       const dirOf = (lon, lat, out) => out.copy(bu).multiplyScalar(Math.cos(lon) * Math.cos(lat)).addScaledVector(bv, Math.sin(lon) * Math.cos(lat)).addScaledVector(pole, Math.sin(lat));
@@ -1091,7 +1164,7 @@ export default {
       const inDust = ss(CLOUD_LO - 140, CLOUD_LO + 160, y) * (1 - ss(CLOUD_HI - 190, CLOUD_HI + 30, y)), above = ss(CLOUD_HI - 70, CLOUD_HI + 110, y);
       scene.fog.density = lerp(lerp(0.00055, 0.0033, inDust), 0.00002, above);
       const near = fl / (1 + eye.distanceToSquared(shipPos) / (420 * 420));
-      fogC.copy(fogLow).lerp(fogDust, ss(CLOUD_LO - 260, CLOUD_LO + 60, y)).lerp(fogWarm, Math.min(0.75, near * 0.8) * inDust);
+      fogC.copy(fogLow).lerp(fogDust, ss(CLOUD_LO - 260, CLOUD_LO + 60, y)).lerp(fogWarm, Math.min(0.7, near * 0.9) * inDust);
       scene.fog.color.copy(fogC); scene.background.copy(fogC).multiplyScalar(inDust);
       // the stars: none at all until the top of the cloud
       const show = ss(CLOUD_HI - 120, CLOUD_HI + 200, y);
@@ -1100,9 +1173,9 @@ export default {
       dustIn.uniforms.uOpacity.value = 0.9; dustTop.uniforms.uOpacity.value = 0.96;
       // the pad's smoke swells and thins
       const since = Math.max(0, u - U_L + 0.012);
-      padSmoke.uniforms.uScale.value = 0.5 + 2.8 * ss(0, 0.12, since) + 2.0 * ss(0.1, 0.5, since);
-      padSmoke.uniforms.uOpacity.value = 0.75 * ss(0, 0.02, since) * (1 - ss(0.25, 0.6, since)) + 0.12;
-      padSmoke.mesh.visible = y < CLOUD_LO + 200;
+      padSmoke.uniforms.uScale.value = 0.55 + 1.5 * ss(0, 0.12, since) + 0.9 * ss(0.1, 0.5, since);
+      padSmoke.uniforms.uOpacity.value = 0.5 * ss(0, 0.02, since) * (1 - ss(0.2, 0.5, since)) + 0.1;
+      padSmoke.mesh.visible = y < CLOUD_LO + 200; motes.visible = y > CLOUD_LO - 220 && y < CLOUD_HI + 150;
       // the wheel, the sails, the candle boats
       if (wheel) wheel.rotation.x = time * 0.5;
       if (sails) sails.rotateZ(dt * 0.22);
