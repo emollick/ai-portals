@@ -190,7 +190,16 @@ export default {
             float fres = pow(1.0 - max(dot(N, V), 0.0), 3.0);
             vec3 col = mix(lin(vec3(0.40, 0.30, 0.20)), skyMirror(reflect(-V, N), uSun), 0.10 + fres * 0.5);
             col += lin(vec3(1.0, 0.82, 0.55)) * pow(max(dot(N, normalize(uSun + V)), 0.0), 220.0) * 2.0;
-            gl_FragColor = vec4(col, wetK * (0.45 + 0.3 * fres));
+            float a = wetK * (0.45 + 0.3 * fres);
+            // the last wave's thin film, sliding up and back in step with the sea, with a rim of foam; and the lace older waves left
+            float fe = 87.0 - 4.2 * sin(uTime * 0.55 + vW.x * 0.012) - 1.8 * sin(uTime * 0.31 + vW.x * 0.031) + (n - 0.5) * 5.0;
+            float film = smoothstep(fe - 0.4, fe + 1.2, vW.z);
+            col = mix(col, skyMirror(reflect(-V, N), uSun) * 0.95 + lin(vec3(0.10, 0.20, 0.20)) * 0.3, film * (0.4 + 0.55 * fres)); a = mix(a, 0.9, film);
+            float h2 = vnoise(vW.xz * 1.9), rim = smoothstep(1.3, 0.0, abs(vW.z - fe - 0.3)) * (0.55 + 0.45 * h2);
+            float lace = smoothstep(0.07, 0.0, abs(fract((vW.z + n * 16.0 + sin(vW.x * 0.07) * 2.0) * 0.14) - 0.5)) * smoothstep(0.45, 0.8, h2) * (1.0 - film) * wetK * 0.6;
+            col = mix(col, lin(vec3(1.0, 0.96, 0.90)), clamp(rim + lace, 0.0, 1.0)); a = max(a, clamp(rim + lace, 0.0, 1.0) * wetK);
+            col += lin(vec3(1.0, 0.9, 0.7)) * step(0.985, vnoise(vW.xz * 9.0)) * wetK * 0.6;      // grains that catch the sun
+            gl_FragColor = vec4(col, a);
           }`,
       })));
     }
@@ -710,7 +719,7 @@ export default {
       let k = 0;
       for (let t = 0; t < n * 8 && k < n; t++) {
         const x = rng.range(-560, 560), z = rng.range(-560, 64), d = Math.hypot(x, z);
-        if (d < 60 || noise.fbm2(x * 0.018 + 9, z * 0.018, 2) < -0.02) continue;
+        if (d < 60 || Math.hypot(x - BOWLS[0], z - BOWLS[1]) < 11 || noise.fbm2(x * 0.018 + 9, z * 0.018, 2) < -0.02) continue;
         const cl = rng.int(1, 4);      // a clump of tufts
         for (let j = 0; j < cl && k < n; j++) {
           const cx = x + rng.range(-1.6, 1.6), cz = z + rng.range(-1.6, 1.6), s = rng.range(1.6, 3.8);

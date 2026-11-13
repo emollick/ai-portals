@@ -223,12 +223,12 @@ void main() {
   gl_Position = projectionMatrix * mv;
 }`;
 const PUFF_FRAG = /* glsl */`
-uniform sampler2D uTex; uniform vec3 fogColor; uniform float fogDensity, uOpacity, uStar, uAbove, uNear;
+uniform sampler2D uTex; uniform vec3 fogColor; uniform float fogDensity, uOpacity, uStar, uAbove, uNear, uInside;
 varying vec2 vUv; varying float vDepth, vLit, vKind, vSeed;
 void main() {
   vec2 uv = vUv; if (vSeed > 0.5) uv.x = 1.0 - uv.x;
   vec4 t = texture2D(uTex, uv);
-  float a = t.a * uOpacity * smoothstep(uNear * 0.2, uNear, vDepth);
+  float a = t.a * uOpacity * smoothstep(uNear * 0.2, uNear, vDepth) * clamp(vLit * 6.0 + uInside, 0.0, 1.0);
   if (a < 0.004) discard;
   vec3 dust = mix(vec3(0.020, 0.017, 0.024), vec3(0.060, 0.052, 0.066), t.r);
   vec3 warm = vec3(1.0, 0.52, 0.20) * vLit * (0.25 + 0.75 * t.r);
@@ -351,7 +351,7 @@ export default {
 
     // ---- the road of the flight ----
     const gy = (x, z, up) => height(x, z) + up;
-    const PTS = [[-40, gy(-40, 140, 34), 140], [-30, gy(-30, 0, 32), 0], [8, gy(8, -165, 30) + 6, -165], [34, gy(34, -330, 32), -330], [12, gy(12, -500, 34), -500],
+    const PTS = [[-40, gy(-40, 140, 34), 140], [-30, gy(-30, 0, 32), 0], [-14, gy(-14, -165, 30) + 7, -165], [34, gy(34, -330, 32), -330], [12, gy(12, -500, 34), -500],
       [-10, gy(-10, -680, 36), -680], [0, gy(0, -860, 40), -860], [0, PAD_Y + 56, -1010], [0, 330, -1160], [0, 640, -1330], [0, 1000, -1520], [0, 1340, -1720],
       [0, 1590, -1930], [0, 1700, -2160], [0, TOP_Y, -2400], [0, TOP_Y, -2640]];
     const path = makePath(PTS), LEN = path.length;
@@ -420,7 +420,8 @@ export default {
     // the bridge: where the main lane meets the river
     let BZ = -170; for (let i = 0; i < 12; i++) BZ = riverZ(laneX(BZ));
     const BX = laneX(BZ), BRIDGE_Y = waterY(BX) + 4.6;
-    const laneY = (x, z) => { const d = Math.hypot(x - BX, z - BZ); return d < 30 ? Math.max(height(x, z), BRIDGE_Y - 0.25 - 2.2 * (d / 30) ** 2 * 0) : height(x, z); };
+    const bridgeTop = (d) => (d <= 30 ? BRIDGE_Y + 1.5 * (1 - (d / 30) ** 2) : BRIDGE_Y - (d - 30) * 0.3);
+    const laneY = (x, z) => { const d = Math.hypot(x - BX, z - BZ); return d < 46 ? Math.max(height(x, z), bridgeTop(d)) : height(x, z); };
     // walk a lane: points every `step` metres with the lane's direction
     function walk(poly, step, fn) {
       let carry = 0;
@@ -455,6 +456,8 @@ export default {
       } else parts.push([BOX, '#2a2019', M(0, 1.9, k.d / 2 + 0.05, 4.2, 3.8, 0.12)], [BOX, '#2a2019', M(0, k.h + 0.9, k.d / 2 + 0.05, 1.2, 1.2, 0.1)]);
       return keep(mergeGeo(parts));
     });
+    const HALL = [GREEN[0] - GREEN_R - 42, GREEN[1] + 44], MILL = [-196, riverZ(-196) - 21];
+    const blocks = [{ x: HALL[0], z: HALL[1], r: 15 }, { x: MILL[0], z: MILL[1], r: 13 }];      // ground kept for the hall and the mill
     const houses = [], winM = [], winC = [], RH = R.houses;
     const _m = new THREE.Matrix4(), _c = new THREE.Color();
     const WINCOL = [[2.6, 1.6, 0.62], [2.8, 1.35, 0.42], [2.3, 1.75, 0.9], [2.9, 1.9, 0.7], [1.5, 1.7, 2.0]];
@@ -492,7 +495,8 @@ export default {
     const houseOK = (x, z, r, top) => {
       if (riverDist(x, z) < 27 + r * 0.4) return false;
       if (Math.hypot(x - HILL[0], z - HILL[1]) < 215 || Math.hypot(x - KNOLL[0], z - KNOLL[1]) < 44) return false;
-      if (Math.hypot(x - GREEN[0], z - GREEN[1]) < GREEN_R + 20 + r * 0.5) return false;
+      if (Math.hypot(x - GREEN[0], z - GREEN[1]) < GREEN_R + 15 + r * 0.3) return false;
+      for (const b of blocks) if (Math.hypot(b.x - x, b.z - z) < b.r + r) return false;
       if (!clearOfRoad(x, z, height(x, z) + top)) return false;
       for (const h of houses) if (Math.hypot(h.x - x, h.z - z) < h.r + r + 2.5) return false;
       return true;
@@ -511,7 +515,7 @@ export default {
       });
     }
     settle(lanes.main.filter((p) => p[1] > -770), 19, [1, -1], 0.86, [0, 0, 1, 2, 0, 2]);
-    settle(lanes.ring, 19, [1], 0.95, [2, 2, 0, 1]);      // the ring's right hand is outward: the houses face the green
+    settle(lanes.ring, 19, [-1], 0.95, [2, 2, 0, 1]);      // outward of the ring: the houses face the green
     settle(lanes.south, 21, [1, -1], 0.7, [0, 1, 0, 3]);
     settle(lanes.north, 22, [-1], 0.7, [0, 1, 2]);
     settle(lanes.east, 22, [1, -1], 0.75, [0, 1, 2, 0, 3]);
@@ -568,12 +572,12 @@ export default {
     // the bridge: a stone hump with parapets, two piers, a lamp at each corner
     {
       const ry = Math.atan2(laneX(BZ - 4) - laneX(BZ + 4), -8), parts = [];
-      for (let i = -4; i <= 4; i++) { const zz = i * 4, hump = 1.5 * (1 - (i / 4.6) ** 2); parts.push([BOX, '#7d776d', M(0, hump - 0.5, zz, 6.4, 1.0, 4.3, 0, -Math.atan(-2 * 1.5 * i / (4.6 * 4.6) / 4) * 0)]);
+      for (let i = -7; i <= 7; i++) { const zz = i * 4, hump = 1.5 * (1 - (zz / 30) ** 2); parts.push([BOX, '#7d776d', M(0, hump - 0.75, zz, 6.4, 1.5, 4.3)]);
         for (const sx of [-1, 1]) parts.push([BOX, '#8a847a', M(sx * 3.0, hump + 0.45, zz, 0.5, 1.0, 4.3)]); }
-      for (const pz of [-7, 7]) parts.push([BOX, '#6a655d', M(0, -3.2, pz, 6.0, 6.0, 2.2)]);
+      for (const pz of [-9, 0, 9]) parts.push([BOX, '#6a655d', M(0, -3.0, pz, 6.0, 7.0, 2.2)]);
       addSet(parts, BX, BRIDGE_Y, BZ, ry, new THREE.Color(1.5, 1.25, 1.0));
       const L = local(BX, BZ, ry);
-      for (const [lx, lz] of [[-3, -17], [3, -17], [-3, 17], [3, 17], [-3, 0], [3, 0]]) { const p = L(lx, lz); lamp(p[0], BRIDGE_Y + (lz === 0 ? 4.4 : 3.6), p[1], WARM, 2.6, 9, 1.1); }
+      for (const [lx, lz] of [[-3, -27], [3, -27], [-3, 27], [3, 27], [-3, -9], [3, 9]]) { const p = L(lx, lz); lamp(p[0], bridgeTop(Math.abs(lz)) + 1.9, p[1], WARM, 2.6, 9, 1.1); }
     }
     // the green: a pavilion on its north side, a pole in the middle with strings of lights out to a ring of poles
     const poleM = [];
@@ -602,11 +606,11 @@ export default {
     }
     // the meeting hall with its bell tower, west of the green
     {
-      const x = GREEN[0] - GREEN_R - 34, z = GREEN[1] + 44, y = height(x, z), parts = [];
+      const x = HALL[0], z = HALL[1], y = height(x, z), parts = [];
       parts.push([BOX, '#d9d5ca', M(0, 3.4, 0, 9, 7.6, 18)], [PRISM, '#2c3038', M(0, 7.2, 0, 10.2, 4.6, 19)], [BOX, '#d2cec3', M(0, 7.5, 11.2, 5.2, 15.8, 5.2)],
         [BOX, '#3a3f49', M(0, 15.6, 11.2, 5.9, 0.3, 5.9)], [CONE, '#2c3038', M(0, 18.6, 11.2, 4.0, 6.0, 4.0, Math.PI / 4)], [BOX, '#2f241b', M(0, 1.5, 13.84, 2.0, 3.0, 0.12)]);
-      if (houseOK(x, z, 12, 22)) {
-        addSet(parts, x, y, z, 0, new THREE.Color(1.35, 1.2, 1.0)); houses.push({ x, z, r: 13 });
+      {
+        addSet(parts, x, y, z, 0, new THREE.Color(1.35, 1.2, 1.0));
         for (let i = 0; i < 4; i++) for (const sx of [-1, 1]) { winM.push(M(x + sx * 4.56, y + 3.9, z - 6 + i * 4, 0.1, 3.0, 1.1)); winC.push(2.9, 1.9, 0.75); stamp(x + sx * 8, z - 6 + i * 4, 6, WARM, 0.6); }
         for (const [dx, dz, tw] of [[0, 2.66, 0], [2.66, 0, 1], [-2.66, 0, 1]]) { winM.push(M(x + dx, y + 13.2, z + 11.2 + dz, tw ? 0.1 : 1.2, 1.8, tw ? 1.2 : 0.1)); winC.push(2.6, 1.7, 0.7); }
         lamp(x + 1.8, y + 3.4, z + 14.3, WARM, 2.4, 9, 1.1);
@@ -615,9 +619,9 @@ export default {
     // the mill on the north bank, its wheel in the water
     let wheel = null;
     {
-      const x = -196, z = riverZ(-196) - 21, y = height(x, z), wy = waterY(x), parts = [];
+      const x = MILL[0], z = MILL[1], y = height(x, z), wy = waterY(x), parts = [];
       parts.push([BOX, '#9a9388', M(0, 3.8, 0, 11, 8.6, 9)], [PRISM, '#3a2f26', M(0, 8.0, 0, 10.2, 4.2, 12, Math.PI / 2)], [BOX, '#6b655c', M(0, 0.6, 7, 3, 2.4, 6)]);
-      addSet(parts, x, y, z, 0, new THREE.Color(1.3, 1.15, 1.0)); houses.push({ x, z, r: 11 });
+      addSet(parts, x, y, z, 0, new THREE.Color(1.3, 1.15, 1.0));
       const wp = [[CYL, '#3a2c20', M(0, 0, 0, 0.5, 2.6, 0.5, 0, 0, Math.PI / 2)]];
       for (let i = 0; i < 12; i++) { const a = i / 12 * 6.283; wp.push([BOX, '#4a3828', M(0, Math.cos(a) * 2.4, Math.sin(a) * 2.4, 0.16, 4.8, 0.16, 0, a)], [BOX, '#5a4634', M(0, Math.cos(a) * 4.6, Math.sin(a) * 4.6, 2.2, 0.12, 1.3, 0, a)]); }
       for (const sx of [-1, 1]) wp.push([keep(new THREE.TorusGeometry(4.7, 0.14, 5, 28)), '#4a3828', M(sx * 1.0, 0, 0, 1, 1, 1, Math.PI / 2)]);
@@ -724,7 +728,7 @@ export default {
     }
     const LAMP_GAIN = 9;
     // what a standing thing takes from the lamps round it: a tint over its own colour
-    const tintAt = (x, z, base = 1, k = 4.2) => { const l = Math.min(2.2, lampAt(x, z)); return _c.setRGB(base * (1 + l * k * 1.25), base * (1 + l * k * 0.85), base * (1 + l * k * 0.4)); };
+    const tintAt = (x, z, base = 1, k = 4.2) => { const l = Math.min(1.4, lampAt(x, z)); return _c.setRGB(base * (1 + l * k * 1.25), base * (1 + l * k * 0.85), base * (1 + l * k * 0.4)); };
     await ctx.yield();
 
     // =====================================================================================================
@@ -926,8 +930,9 @@ export default {
     // the fire's own glare: one big soft point that goes with the ship
     const flareU = { ...FOGU(), uTime, uPx, uMax: { value: 700 }, uGain: { value: 0 } };
     const flarePos = new Float32Array(6);
+    let flareGeo;
     {
-      const g = keep(new THREE.BufferGeometry());
+      const g = flareGeo = keep(new THREE.BufferGeometry());
       g.setAttribute('position', new THREE.BufferAttribute(flarePos, 3)); g.setAttribute('aCol', new THREE.BufferAttribute(new Float32Array([2.4, 1.5, 0.7, 0.9, 0.42, 0.14]), 3));
       g.setAttribute('aSize', new THREE.BufferAttribute(new Float32Array([26, 130]), 1)); g.setAttribute('aPh', new THREE.BufferAttribute(new Float32Array([0.2, 0.7]), 1));
       const pts = new THREE.Points(g, keep(new THREE.ShaderMaterial({ uniforms: flareU, vertexShader: GLOW_VERT, fragmentShader: GLOW_FRAG, fog: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
@@ -965,7 +970,7 @@ export default {
       list.forEach((p, i) => { iPos.set([p[0], p[1], p[2]], i * 3); iSize.set([p[3], p[4]], i * 2); iSeed[i] = R.cloud(); iKind[i] = p[5]; iTrail.set(nearTrail(p[0], p[1], p[2]), i * 2); });
       g.setAttribute('iPos', new THREE.InstancedBufferAttribute(iPos, 3)); g.setAttribute('iSize', new THREE.InstancedBufferAttribute(iSize, 2)); g.setAttribute('iSeed', new THREE.InstancedBufferAttribute(iSeed, 1));
       g.setAttribute('iTrail', new THREE.InstancedBufferAttribute(iTrail, 2)); g.setAttribute('iKind', new THREE.InstancedBufferAttribute(iKind, 1)); g.instanceCount = n;
-      const uniforms = { ...FOGU(), uTex: { value: puffTex }, uShip, uFlame, uShipQ, uStar, uAbove, uScale: { value: 1 }, uOpacity: { value: 1 }, uNear: { value: 150 }, uLitR: { value: 190 }, ...extra };
+      const uniforms = { ...FOGU(), uTex: { value: puffTex }, uShip, uFlame, uShipQ, uStar, uAbove, uScale: { value: 1 }, uOpacity: { value: 1 }, uInside: { value: 1 }, uNear: { value: 150 }, uLitR: { value: 190 }, ...extra };
       const mesh = new THREE.Mesh(g, keep(new THREE.ShaderMaterial({ uniforms, vertexShader: PUFF_VERT, fragmentShader: PUFF_FRAG, fog: true, transparent: true, depthWrite: false })));
       mesh.frustumCulled = false; scene.add(mesh); return { mesh, uniforms };
     }
@@ -1062,7 +1067,7 @@ export default {
     // =====================================================================================================
     const eye = new THREE.Vector3(), shipPos = new THREE.Vector3(), shipTan = new THREE.Vector3(), buf = new THREE.Vector2(), fogC = new THREE.Color();
     const shipAt = (u, out) => trailPoint(shipQ(u), out);
-    const flameAt = (u) => (u < U_L ? 0.16 * ss(0.0, 0.03, u) + 0.1 : u < U_E ? ss(U_L, U_L + 0.025, u) * 0.75 + 0.25 : 1 - ss(U_E, U_E + 0.02, u));
+    const flameAt = (u) => (u < U_L ? 0.07 + 0.08 * ss(0.04, U_L, u) : u < U_E ? ss(U_L, U_L + 0.025, u) * 0.75 + 0.25 : 1 - ss(U_E, U_E + 0.02, u));
     function update(dt, time, camera, u = 0) {
       uTime.value = time;
       if (ctx.renderer) { ctx.renderer.getDrawingBufferSize(buf); uPx.value = buf.y / (2 * Math.tan((camera.fov || 62) * Math.PI / 360)); uPxS.value = buf.y / 760; }
@@ -1079,9 +1084,9 @@ export default {
       if (u >= U_E) ship.rotateZ(0.5 * ss(U_E, 1, u) + 0.05 * Math.sin(time * 0.5));      // spent, she lies over and stops, and so do they
       flame.visible = fl > 0.02; flame.scale.set(0.6 + 0.6 * fl, (0.25 + 1.5 * fl) * flick, 0.6 + 0.6 * fl);
       uShip.value.copy(shipPos); uShipQ.value = q; uFlame.value = fl * flick;
-      fire.position.copy(shipPos); fire.position.y += 3; fire.intensity = 52000 * fl * flick;
+      fire.position.copy(shipPos); fire.position.y += 3; fire.intensity = 30000 * fl * flick;
       flarePos.set([shipPos.x - shipTan.x * 3, shipPos.y - shipTan.y * 3, shipPos.z - shipTan.z * 3, shipPos.x - shipTan.x * 6, shipPos.y - shipTan.y * 6, shipPos.z - shipTan.z * 6]);
-      flareU.uGain.value = fl * flick * 1.5; flareU.uTime.value = time;
+      flareGeo.attributes.position.needsUpdate = true; flareU.uGain.value = fl * flick * 1.5;
       // the air: clear night below, dust in the cloud, nothing above it
       const inDust = ss(CLOUD_LO - 140, CLOUD_LO + 160, y) * (1 - ss(CLOUD_HI - 190, CLOUD_HI + 30, y)), above = ss(CLOUD_HI - 70, CLOUD_HI + 110, y);
       scene.fog.density = lerp(lerp(0.00055, 0.0033, inDust), 0.00002, above);
@@ -1091,7 +1096,7 @@ export default {
       // the stars: none at all until the top of the cloud
       const show = ss(CLOUD_HI - 120, CLOUD_HI + 200, y);
       sky.visible = show > 0.001; uShow.value = show; uStar.value = show; uAbove.value = above;
-      dustIn.mesh.visible = y < CLOUD_HI + 260 && y > 60; deck.visible = y > CLOUD_HI - 55;
+      dustIn.mesh.visible = y < CLOUD_HI + 260; dustIn.uniforms.uInside.value = ss(CLOUD_LO - 260, CLOUD_LO - 40, y); deck.visible = y > CLOUD_HI - 55;
       dustIn.uniforms.uOpacity.value = 0.9; dustTop.uniforms.uOpacity.value = 0.96;
       // the pad's smoke swells and thins
       const since = Math.max(0, u - U_L + 0.012);

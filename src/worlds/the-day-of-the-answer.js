@@ -174,9 +174,11 @@ export default {
     const bronze = keep(new THREE.MeshStandardMaterial({ color: '#8a5a2c', roughness: 0.5, metalness: 0.2 }));
     const bronzeLit = keep(new THREE.MeshStandardMaterial({ color: '#b07a3a', roughness: 0.45, metalness: 0.2 }));
     {
-      box(-200, -HALL_W, 0, 120, FRONT_Z, BACK_Z, stone); box(HALL_W, 200, 0, 120, FRONT_Z, BACK_Z, stone);      // tier 1, either side of the hall
+      // tier 1, either side of the hall and then of the wider chamber (each mass's inner face stands behind the room's own lining)
+      for (const s of [-1, 1]) { box(s * HALL_W, s * 200, 0, 120, FRONT_Z, CH_Z, stone); box(s * (CH_W + 1), s * 200, 0, 120, CH_Z, BACK_Z, stone); }
       box(-HALL_W, HALL_W, HALL_H, 120, FRONT_Z, CH_Z, stone);                                                     // over the hall
-      box(-HALL_W, HALL_W, CH_H + 0.6, 120, CH_Z, BACK_Z, stone);                                                  // over the chamber
+      box(-CH_W - 1, CH_W + 1, CH_H + 0.6, 120, CH_Z, BACK_Z, stone);                                              // over the chamber
+      box(-CH_W - 1, CH_W + 1, 0, CH_H + 0.6, FACE_Z - 41.2, BACK_Z, stone);                                       // behind the console
       box(-HALL_W, HALL_W, DOOR_H, HALL_H, FRONT_Z, FRONT_Z - 26, stone);                                         // the lintel
       box(-150, 150, 120, 200, FRONT_Z - 40, BACK_Z + 40, stone);
       box(-100, 100, 200, 270, FRONT_Z - 80, BACK_Z + 80, stone);
