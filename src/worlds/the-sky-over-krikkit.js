@@ -882,7 +882,7 @@ export default {
       const mats = [];
       for (let i = 0; i < 400 && mats.length < 90; i++) {
         const x = VC[0] + R.misc.gauss() * 330, z = VC[1] + R.misc.gauss() * 330, f = fieldOf(x, z);
-        if (f.kind < 0.22 || f.kind > 0.4 || f.edge < 0.12 || riverDist(x, z) < 30 || laneDist(x, z) < 8 || houses.some((h) => Math.hypot(h.x - x, h.z - z) < h.r + 4)) continue;
+        if (f.kind < 0.22 || f.kind > 0.4 || f.edge < 9 || riverDist(x, z) < 30 || laneDist(x, z) < 8 || houses.some((h) => Math.hypot(h.x - x, h.z - z) < h.r + 4)) continue;
         const s = 0.8 + R.misc() * 0.5; mats.push(M(x, height(x, z) - 0.1, z, s, s, s, R.misc() * 6));
       }
       instances(keep(new THREE.LatheGeometry(prof, 10)), keep(new THREE.MeshLambertMaterial({ color: '#6f6038' })), mats, tintOfMatrix(1, 3));
@@ -938,7 +938,7 @@ export default {
       // hedgerow trees and copses in the valley
       for (let i = 0, n = Math.round(2600 * D); i < n; i++) {
         const x = LX0 + RT() * LW, z = LZ0 + RT() * LD, f = fieldOf(x, z), copse = noise.fbm2(x * 0.004 + 3, z * 0.004, 3);
-        if (f.edge < 0.07 && RT() < 0.75) put(RT() < 0.8 ? 0 : 1, x, z, 0.7 + RT() * 0.6);
+        if (f.edge < 3.2 && RT() < 0.75) put(RT() < 0.8 ? 0 : 1, x, z, 0.7 + RT() * 0.6);
         else if (copse > 0.3 && RT() < 0.8) put(RT() < 0.75 ? 0 : 3, x, z, 0.8 + RT() * 0.7);
       }
       // woods on the far country, firs on the high ground
