@@ -208,15 +208,14 @@ void main() {
 }`;
 const PUFF_VERT = /* glsl */`
 attribute vec3 iPos; attribute vec2 iSize; attribute float iSeed; attribute vec2 iTrail; attribute float iKind;
-uniform vec3 uShip; uniform float uFlame, uShipQ, uScale, uLitR;
-varying vec2 vUv; varying float vDepth, vLit, vKind, vSeed;
+uniform vec3 uShip, uStarDir; uniform float uFlame, uShipQ, uScale, uLitR;
+varying vec2 vUv; varying float vDepth, vLit, vKind, vSeed; varying vec3 vLd, vSd;
 void main() {
   vUv = uv; vKind = iKind; vSeed = iSeed;
   vec4 mv = viewMatrix * vec4(iPos, 1.0);
-  float a = iSeed * 6.283, c = cos(a), s = sin(a);
-  vec2 p = position.xy * iSize * uScale;
-  p = mix(vec2(c * p.x - s * p.y, s * p.x + c * p.y), p, step(0.5, iKind));      // the billows of the top stay upright
-  mv.xy += p;
+  vLd = (viewMatrix * vec4(uShip, 1.0)).xyz - mv.xyz;      // from the billow's middle to the fire, as the eye sees it
+  vSd = (viewMatrix * vec4(uStarDir, 0.0)).xyz;
+  mv.xy += position.xy * iSize * uScale;
   vDepth = -mv.z;
   float ds = distance(iPos, uShip);
   float after = step(iTrail.x, uShipQ) * exp(-(uShipQ - iTrail.x) * 14.0) / (1.0 + iTrail.y * iTrail.y / (70.0 * 70.0));
@@ -225,16 +224,21 @@ void main() {
 }`;
 const PUFF_FRAG = /* glsl */`
 uniform sampler2D uTex; uniform vec3 fogColor; uniform float fogDensity, uOpacity, uStar, uAbove, uNear, uInside, uWarm;
-varying vec2 vUv; varying float vDepth, vLit, vKind, vSeed;
+varying vec2 vUv; varying float vDepth, vLit, vKind, vSeed; varying vec3 vLd, vSd;
 void main() {
   vec2 uv = vUv; if (vSeed > 0.5) uv.x = 1.0 - uv.x;
   vec4 t = texture2D(uTex, uv);
-  float a = t.a * uOpacity * smoothstep(uNear * 0.2, uNear, vDepth) * clamp(vLit * 3.0 + uInside, 0.0, 1.0);
+  float a = t.a * uOpacity * smoothstep(uNear * 0.2, uNear, vDepth) * clamp(vLit * 3.0 - 0.25 + uInside * 1.25, 0.0, 1.0);
   if (a < 0.004) discard;
-  vec3 dust = mix(vec3(0.020, 0.017, 0.024), vec3(0.060, 0.052, 0.066), t.r);
-  vec3 warm = vec3(1.0, 0.50, 0.19) * vLit * uWarm * (0.2 + 0.8 * t.r);
-  vec3 star = vec3(0.095, 0.125, 0.205) * vKind * uStar * (0.05 + 0.95 * t.r * t.r);
-  vec3 col = dust * (1.0 - vKind * 0.5) + warm + star;
+  // each billow is shaded as a ball, its lumps roughening the ball's face: a side to the light and a side away from it
+  vec2 q = (vUv - 0.5) * 2.0; float rr = min(1.0, dot(q, q));
+  vec3 n = normalize(vec3(q.x, q.y + (t.r - 0.45) * 0.9, sqrt(1.0 - rr) * 0.8 + 0.15));
+  float dF = clamp(dot(n, normalize(vLd)) * 0.62 + 0.42, 0.0, 1.0); dF *= dF;
+  float dS = clamp(dot(n, normalize(vSd)) * 0.65 + 0.38, 0.0, 1.0); dS *= dS;
+  vec3 dust = mix(vec3(0.016, 0.014, 0.020), vec3(0.050, 0.044, 0.056), t.r);
+  vec3 warm = vec3(1.0, 0.50, 0.19) * vLit * uWarm * (0.06 + 1.5 * dF);
+  vec3 star = vec3(0.095, 0.125, 0.205) * vKind * uStar * (0.04 + 1.4 * dS) * (0.45 + 0.55 * t.r);
+  vec3 col = dust * (1.0 - vKind * 0.6) + warm + star;
   float f = 1.0 - exp(-fogDensity * fogDensity * vDepth * vDepth);
   col = mix(col, fogColor * uInside, f * (1.0 - vKind * uAbove));      // seen from under the cloud, what the fire does not reach is the black sky
   // from above, far billows sink into the haze of the cloud's horizon
@@ -301,7 +305,7 @@ void main() {
   vec2 p = vW.xz; float h = H(p), h2 = H(p + uLdir * 150.0);
   float sh = clamp(0.5 + (h2 - h) * -7.0, 0.0, 1.0), crest = smoothstep(0.34, 0.72, h);      // the slopes that face the galaxy's heart take its light
   vec3 col = mix(vec3(0.003, 0.004, 0.008), vec3(0.036, 0.048, 0.082), crest * 0.45 + sh * 0.6 * (0.3 + crest)) * uStar;
-  col += vec3(0.030, 0.022, 0.012) * sh * crest * uStar; col *= 1.6;
+  col += vec3(0.030, 0.022, 0.012) * sh * crest * uStar; col *= 2.3;
   col = mix(col, vec3(0.022, 0.030, 0.055) * uStar, 1.0 - exp(-vDepth * 0.00011));
   gl_FragColor = vec4(col, 1.0);
 }`;
@@ -1039,7 +1043,7 @@ export default {
       list.forEach((p, i) => { iPos.set([p[0], p[1], p[2]], i * 3); iSize.set([p[3], p[4]], i * 2); iSeed[i] = R.cloud(); iKind[i] = p[5]; iTrail.set(nearTrail(p[0], p[1], p[2]), i * 2); });
       g.setAttribute('iPos', new THREE.InstancedBufferAttribute(iPos, 3)); g.setAttribute('iSize', new THREE.InstancedBufferAttribute(iSize, 2)); g.setAttribute('iSeed', new THREE.InstancedBufferAttribute(iSeed, 1));
       g.setAttribute('iTrail', new THREE.InstancedBufferAttribute(iTrail, 2)); g.setAttribute('iKind', new THREE.InstancedBufferAttribute(iKind, 1)); g.instanceCount = n;
-      const uniforms = { ...FOGU(), uTex: { value: puffTex }, uShip, uFlame, uShipQ, uStar, uAbove, uScale: { value: 1 }, uOpacity: { value: 1 }, uInside: { value: 1 }, uWarm: { value: 0.6 }, uNear: { value: 75 }, uLitR: { value: 80 }, ...extra };
+      const uniforms = { ...FOGU(), uTex: { value: puffTex }, uShip, uFlame, uShipQ, uStar, uAbove, uScale: { value: 1 }, uOpacity: { value: 1 }, uInside: { value: 1 }, uWarm: { value: 0.85 }, uNear: { value: 60 }, uLitR: { value: 185 }, uStarDir: { value: SKY_BU.clone().add(new THREE.Vector3(0, 0.9, 0)).normalize() }, ...extra };
       const mesh = new THREE.Mesh(g, keep(new THREE.ShaderMaterial({ uniforms, vertexShader: PUFF_VERT, fragmentShader: PUFF_FRAG, fog: true, transparent: true, depthWrite: false })));
       mesh.frustumCulled = false; scene.add(mesh); return { mesh, uniforms };
     }
@@ -1047,12 +1051,12 @@ export default {
     let dustIn, dustTop, padSmoke, motes;
     {
       // inside: billows all about the road through the layer, far ones first (we look up the road)
-      const list = [], n = Math.round(1150 * D);
+      const list = [], n = Math.round(2300 * D);
       for (let i = 0; i < n; i++) {
         const u = 0.30 + RC() * 0.52; path.pointAt(u, v3); if (v3.y < CLOUD_LO - 90 || v3.y > CLOUD_HI + 30) continue;
-        const a = RC() * 6.283, r = 28 + Math.pow(RC(), 0.7) * 520, s = 150 + RC() * 300;
-        const y = Math.min(CLOUD_HI - 30, Math.max(CLOUD_LO - 30, v3.y + RC.gauss() * 130));
-        list.push([v3.x + Math.cos(a) * r, y, v3.z + Math.sin(a) * r * 0.8, s * 1.4, s * (0.7 + RC() * 0.5), 0, u]);
+        const a = RC() * 6.283, r = 26 + Math.pow(RC(), 0.8) * 380, s = (55 + RC() * 130) * (1 + r * 0.003);
+        const y = Math.min(CLOUD_HI - 30, Math.max(CLOUD_LO - 30, v3.y + RC.gauss() * 110));
+        list.push([v3.x + Math.cos(a) * r, y, v3.z + Math.sin(a) * r * 0.8, s * 1.35, s * (0.75 + RC() * 0.4), 0, u]);
       }
       // the underside: a wide ragged ceiling that only the fire ever shows
       for (let i = 0, m = Math.round(420 * D); i < m; i++) { const a = RC() * 6.283, r = Math.sqrt(RC()) * 2600, s = 380 + RC() * 520; list.push([Math.cos(a) * r, CLOUD_LO + RC() * 110, -1250 + Math.sin(a) * r, s * 1.5, s * 0.55, 0, 0.3 + RC() * 0.05]); }
@@ -1060,12 +1064,12 @@ export default {
       dustIn = puffField(list, {}); dustIn.mesh.renderOrder = 2;
       // the top: a country of dark billows under the stars, with towers standing out of it
       const tops = [];
-      for (let i = 0, m = Math.round(2600 * D); i < m && tops.length < 760 * D; i++) {
+      for (let i = 0, m = Math.round(2600 * D); i < m && tops.length < 1150 * D; i++) {
         const a = RC() * 6.283, r = 260 + Math.pow(RC(), 1.3) * 8200, x = Math.cos(a) * r, z = -2150 + Math.sin(a) * r;
         const massif = noise.fbm2(x * 0.00042 + 5, z * 0.00042, 3); if (massif < 0.02 && RC() < 0.9) continue;      // they stand in ranges, with open deck between
         const near = path.nearestXZ(x, z).dist, s = (150 + RC() * 300) * (1 + r * 0.00012);
         if (near < 300 + s) continue;      // nothing stands in our road
-        if (massif > 0.2 && RC() < 0.45) {      // a tower: round billows piled on one another, each smaller, leaning a little
+        if (massif > 0.1 && RC() < 0.55) {      // a tower: round billows piled on one another, each smaller, leaning a little
           let yy = CLOUD_HI - 80, sz = s * 1.15; const lx = RC.gauss() * 0.16, lz = RC.gauss() * 0.16, nb = 3 + Math.floor(RC() * 4);
           for (let k = 0; k < nb; k++) { tops.push([x + lx * k * sz + RC.gauss() * sz * 0.1, yy + sz * 0.36, z + lz * k * sz, sz * 1.3, sz, 1]); yy += sz * 0.46; sz *= 0.76; }
           for (let k = 0; k < 3; k++) { const s2 = s * (0.5 + RC() * 0.4); tops.push([x + RC.gauss() * s * 0.6, CLOUD_HI - 70 + s2 * 0.3, z + RC.gauss() * s * 0.6, s2 * 1.7, s2 * 0.85, 1]); }      // its shoulders

@@ -94,11 +94,9 @@ There are also 20 journeys, which fly a set of worlds in order: [One Drop of Wat
 
 The worlds are uneven, and the agents' own grading says so. Every world carries a band from 1 to 5: 40 of the 471 are in band 5 and 28 in band 1. The bands are what the picker uses to decide which worlds a visit opens with.
 
-## This fork: ten worlds from The Hitchhiker's Guide to the Galaxy
+## The Hitchhiker's Guide worlds
 
-This fork adds ten worlds imagined from Douglas Adams's books, and a journey, **Don't Panic**, that flies them in order (`?suite=dont-panic`). Each is one file in `src/worlds`, 550 to 1,100 lines, against about 3,000 for a typical world upstream: they are early drafts, written by Claude agents in parallel, one agent per world, and checked only by rendering two stills of each. Expect rough edges. The gallery has no thumbnails for them yet.
-
-To open one on its own from source: `npm start`, then `http://localhost:8000/?world=<id>`. To render stills of a world into `shots/` (needs [Playwright](https://playwright.dev) and the local server running): `node tools/shot.mjs <id>`. `vercel.json` deploys the site to Vercel with the repository's own build.
+Ten more worlds, imagined from Douglas Adams's *The Hitchhiker's Guide to the Galaxy* books, and a journey, **Don't Panic**, that flies them in order. They have their own heading in the gallery.
 
 <table>
 <tr>
@@ -122,8 +120,6 @@ To open one on its own from source: `npm start`, then `http://localhost:8000/?wo
 <td valign="top"><img src="readme/hitchhikers/letters-of-fire.png" alt="Giant burning letters along a mountain wall in a red desert at dusk" width="100%"><br><b>Letters of Fire</b><br><sub><code>letters-of-fire</code> · God's Final Message to His Creation, read along a mountain range.</sub></td>
 </tr>
 </table>
-
-The rest of this README describes the original site as published upstream at [emollick/ai-portals](https://github.com/emollick/ai-portals); its counts (471 worlds, 20 journeys) do not include these ten.
 
 ## How it was built
 
