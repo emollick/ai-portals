@@ -578,10 +578,11 @@ export default {
     // =====================================================================================================
     // THE HALL: a dark lining, a polished floor, two rows of columns under a ribbed vault
     // =====================================================================================================
-    const dark = keep(new THREE.MeshStandardMaterial({ color: '#0e1016', roughness: 0.55, metalness: 0.3 }));
-    const darker = keep(new THREE.MeshStandardMaterial({ color: '#07080b', roughness: 0.3, metalness: 0.5 }));
-    const steel = keep(new THREE.MeshStandardMaterial({ color: '#2a2e38', roughness: 0.5, metalness: 0.4 }));
-    const panelMat = keep(new THREE.MeshStandardMaterial({ color: '#181b24', roughness: 0.6, metalness: 0.3 }));
+    // (matt, all of it: a polished wall beside the panel's lamp threw a white glare the size of the wall)
+    const dark = keep(new THREE.MeshStandardMaterial({ color: '#0e1016', roughness: 0.92, metalness: 0 }));
+    const darker = keep(new THREE.MeshStandardMaterial({ color: '#07080b', roughness: 0.62, metalness: 0.1 }));
+    const steel = keep(new THREE.MeshStandardMaterial({ color: '#2a2e38', roughness: 0.75, metalness: 0.1 }));
+    const panelMat = keep(new THREE.MeshStandardMaterial({ color: '#181b24', roughness: 0.85, metalness: 0 }));
     const COLZ = []; for (let z = FRONT_Z - 50; z > CH_Z + 5; z -= 42) COLZ.push(z);
     {
       for (const s of [-1, 1]) box(s * (HALL_W - 1.2), s * (HALL_W - 0.4), 0, HALL_H, FRONT_Z - 27, CH_Z, dark);
@@ -873,7 +874,7 @@ export default {
       });
       // a low rail of steps before the console, and the amber pool on the floor
       for (let k = 0; k < 3; k++) box(-34 + k * 3, 34 - k * 3, k * 0.5 + 0.3, k * 0.5 + 0.8, FACE_Z + 22 - k * 3, FACE_Z + 3, darker);
-      const pool = new THREE.Mesh(keep(new THREE.CircleGeometry(60, 40)), keep(new THREE.MeshBasicMaterial({ color: new THREE.Color(0.5, 0.26, 0.07), transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false })));
+      const pool = new THREE.Mesh(keep(new THREE.CircleGeometry(60, 40)), keep(new THREE.MeshBasicMaterial({ color: new THREE.Color(0.5, 0.26, 0.07), transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending, depthWrite: false })));
       pool.rotation.x = -Math.PI / 2; pool.scale.set(0.7, 1, 1); pool.position.set(0, 2.1, FACE_Z + 50); scene.add(pool);
     }
     await ctx.yield();
@@ -932,7 +933,9 @@ export default {
       scene.background.copy(bgOut).lerp(fogIn, inside);
       // the panel breathes
       const breathe = 0.9 + 0.1 * Math.sin(time * 0.8);
-      amber.intensity = 560 * breathe; amberHi.intensity = 260 * (1.9 - breathe);
+      // (the lamps stand back as we come up to them: at 30 m the panel's own light would wash the console flat)
+      const close = Math.min(1, Math.max(0, (eye.z - FACE_Z - 30) / 220));
+      amber.intensity = (150 + 330 * close) * breathe; amberHi.intensity = (90 + 130 * close) * (1.9 - breathe);
       panelGlow.color.setRGB(2.4 * breathe, 1.45 * breathe, 0.5 * breathe);
       screenMat.color.setRGB(0.25, 1.15 + 0.2 * Math.sin(time * 7.0), 0.55);
       turnReels(time);

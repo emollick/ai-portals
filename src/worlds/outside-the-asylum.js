@@ -130,15 +130,18 @@ export default {
 
     // ---- the sea: swell, a sun road, foam lines that run in, and a swash that climbs the sand
     {
-      const g = new THREE.PlaneGeometry(16000, 7000, 240, 170); g.rotateX(-Math.PI / 2);
+      const g = new THREE.PlaneGeometry(2, 1, 260, 200);      // one sheet, fine near the shore and abreast of the house, coarse far out
+      { const p = g.attributes.position; for (let i = 0; i < p.count; i++) { const sx = p.getX(i), t = p.getY(i) + 0.5; p.setXYZ(i, 8000 * (0.04 * sx + 0.96 * sx ** 5), 0, 60 + 7000 * (0.06 * t + 0.94 * t ** 4)); } }
       const sea = new THREE.Mesh(g, new THREE.ShaderMaterial({
-        uniforms: TU,
+        uniforms: TU, side: THREE.DoubleSide,
         vertexShader: /* glsl */`
           uniform float uTime; varying vec3 vW; varying float vH;
           float swell(vec2 p) { return sin(p.y * 0.055 + uTime * 0.9) * 0.45 + sin(p.y * 0.021 - p.x * 0.012 + uTime * 0.55) * 0.55 + sin(p.x * 0.09 + p.y * 0.13 + uTime * 1.6) * 0.12; }
           void main() {
             vec4 w = modelMatrix * vec4(position, 1.0);
             vH = swell(w.xz) * smoothstep(96.0, 230.0, w.z);
+            float near = smoothstep(280.0, 130.0, w.z) * smoothstep(90.0, 104.0, w.z);      // the rollers coming in
+            w.y += pow(0.5 + 0.5 * sin(w.z * 0.14 + uTime * 1.1 + sin(w.x * 0.013) * 1.5), 5.0) * 0.42 * near;
             w.y += vH + (sin(uTime * 0.55 + w.x * 0.012) * 0.16 + sin(uTime * 0.31 + w.x * 0.031) * 0.07) * smoothstep(200.0, 100.0, w.z);      // the swash
             vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w;
           }`,
@@ -154,22 +157,24 @@ export default {
             vec3 deep = lin(vec3(0.04, 0.20, 0.36)), mid = lin(vec3(0.07, 0.40, 0.50)), shallow = lin(vec3(0.42, 0.70, 0.62));
             vec3 col = mix(shallow, mid, smoothstep(0.0, 1.6, depth)); col = mix(col, deep, smoothstep(1.2, 9.0, depth));
             col += lin(vec3(0.2, 0.5, 0.45)) * max(vH, 0.0) * 0.12;
-            col = mix(col, skyMirror(reflect(-V, N), uSun), 0.12 + fres * 0.8);
+            float near = smoothstep(280.0, 130.0, vW.z) * smoothstep(88.0, 100.0, vW.z);
+            float crest = pow(0.5 + 0.5 * sin(vW.z * 0.14 + uTime * 1.1 + sin(vW.x * 0.013) * 1.5 + (n1 - 0.5) * 0.8), 5.0);
+            col *= 0.82 + 0.5 * crest * near;      // each roller's face catches the light
+            col = mix(col, skyMirror(reflect(-V, N), uSun), 0.06 + fres * 0.5);
             vec3 H = normalize(uSun + V);
             col += lin(vec3(1.0, 0.80, 0.52)) * pow(max(dot(N, H), 0.0), 140.0) * 2.4;
             col += lin(vec3(1.0, 0.90, 0.70)) * pow(max(dot(N, H), 0.0), 600.0) * step(0.5, n3) * 6.0;      // glitter
             // foam: lines that run in and break up, and the lace at the swash's edge
-            float shore = smoothstep(300.0, 110.0, vW.z);
-            float run = fract(vW.z * 0.020 + uTime * 0.10 + n1 * 0.30);
-            float foam = smoothstep(0.84, 0.99, run) * shore * smoothstep(0.30, 0.75, n2 * 0.6 + n3 * 0.5 + shore * 0.25);
-            foam += smoothstep(0.55, 0.0, depth) * (0.55 + 0.45 * n3) + smoothstep(0.16, 0.0, depth);
+            float foam = smoothstep(0.72, 0.98, crest) * near * smoothstep(0.35, 0.8, n2 * 0.55 + n3 * 0.6);
+            foam += smoothstep(0.3, 0.7, crest) * near * smoothstep(0.70, 0.95, n3) * 0.3;      // the lace a roller leaves behind it
+            foam += smoothstep(0.6, 0.0, depth) * (0.5 + 0.5 * n3) + smoothstep(0.18, 0.0, depth);
             foam += smoothstep(0.75, 1.0, vH) * smoothstep(0.5, 0.8, n2) * 0.5;      // a whitecap here and there on the swell
             col = mix(col, lin(vec3(1.0, 0.96, 0.90)), clamp(foam, 0.0, 1.0) * 0.92);
             col = mix(col, uFog, smoothstep(500.0, 6200.0, length(cameraPosition - vW)));
             gl_FragColor = vec4(col, 1.0);
           }`,
       }));
-      sea.position.set(0, SEA_Y, 3560); scene.add(sea);
+      sea.position.set(0, SEA_Y, 0); scene.add(sea);
       // wet sand: a sheet on the beach's own slope, dark where the swash has been and a mirror for the sky at a low angle
       const wg = new THREE.PlaneGeometry(800, 60, 160, 12); wg.rotateX(-Math.PI / 2); wg.translate(0, 0, 80);
       const wp = wg.attributes.position; for (let i = 0; i < wp.count; i++) wp.setY(i, ground(wp.getX(i), wp.getZ(i)) + 0.035);
@@ -179,13 +184,13 @@ export default {
         fragmentShader: GLSL_COMMON + /* glsl */`
           uniform float uTime; uniform vec3 uSun; varying vec3 vW;
           void main() {
-            float n = vnoise(vW.xz * 0.06), edge = 71.0 + n * 9.0 + sin(vW.x * 0.02) * 2.0;
+            float n = vnoise(vW.xz * 0.06), edge = 76.0 + n * 7.0 + sin(vW.x * 0.02) * 2.0;
             float wetK = smoothstep(edge, edge + 7.0, vW.z) * smoothstep(400.0, 330.0, abs(vW.x));
             vec3 V = normalize(cameraPosition - vW), N = normalize(vec3((vnoise(vW.xz * 0.9) - 0.5) * 0.06, 1.0, 0.045));
             float fres = pow(1.0 - max(dot(N, V), 0.0), 3.0);
-            vec3 col = mix(lin(vec3(0.42, 0.32, 0.22)), skyMirror(reflect(-V, N), uSun), 0.18 + fres * 0.82);
+            vec3 col = mix(lin(vec3(0.40, 0.30, 0.20)), skyMirror(reflect(-V, N), uSun), 0.10 + fres * 0.5);
             col += lin(vec3(1.0, 0.82, 0.55)) * pow(max(dot(N, normalize(uSun + V)), 0.0), 220.0) * 2.0;
-            gl_FragColor = vec4(col, wetK * (0.5 + 0.45 * fres));
+            gl_FragColor = vec4(col, wetK * (0.45 + 0.3 * fres));
           }`,
       })));
     }
@@ -554,7 +559,7 @@ export default {
       for (const [px, py, ph] of [[-1.3, 6.9, 2.8], [1.3, 6.9, 2.8], [-1.3, 3.3, 3.4], [1.3, 3.3, 3.4]]) box(g, 2.0, ph, 0.06, px, py, zf - 0.18, M('#245a46', { roughness: 0.45 }));
       box(g, 1.7, 0.42, 0.08, 0, 4.9, zf - 0.2, brass); box(g, 1.3, 0.14, 0.1, 0, 4.9, zf - 0.22, M('#1a1a1a'));      // the letterbox
       const kn = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.07, 6, 14), brass); kn.position.set(0, 6.4, zf - 0.24); g.add(kn); ball(g, 0.22, -2.2, 4.4, zf - 0.3, brass, 10);
-      const num = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.0), new THREE.MeshStandardMaterial({ map: text(64, 64, '#f6f4ee', '#1d2b3a', '42', 'bold 40px Georgia, serif', true), roughness: 0.4 })); num.rotation.y = Math.PI; num.position.set(0, 8.0, zf - 0.2); g.add(num);
+      const num = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.0), new THREE.MeshStandardMaterial({ map: text(64, 64, '#f6f4ee', '#1d2b3a', '42', 'bold 40px Georgia, serif', true), roughness: 0.4 })); num.rotation.y = Math.PI; num.position.set(-5.6, 6.9, zf - 0.1); g.add(num);
       box(g, 8.6, 0.4, 2.6, 0, 0.2, zf - 1.3, M('#a39c8c'));      // the step
       const mat = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 1.9), new THREE.MeshStandardMaterial({ map: text(256, 128, '#9a7a48', '#3a2a1a', 'WELCOME', 'bold 44px Georgia, serif', true), roughness: 1 })); mat.rotation.set(-Math.PI / 2, 0, Math.PI); mat.position.set(0, 0.42, zf - 1.5); g.add(mat);
       const sgn = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 1.6), new THREE.MeshStandardMaterial({ map: text(512, 128, '#f2ead6', '#2d3a2c', 'COME OUTSIDE', 'bold 62px Georgia, serif', true), roughness: 0.6 })); sgn.rotation.y = Math.PI; sgn.position.set(0, 11.6, zf - 0.12); g.add(sgn);
@@ -710,7 +715,7 @@ export default {
         for (let j = 0; j < cl && k < n; j++) {
           const cx = x + rng.range(-1.6, 1.6), cz = z + rng.range(-1.6, 1.6), s = rng.range(1.6, 3.8);
           dm.position.set(cx, ground(cx, cz) - 0.15, cz); dm.rotation.set(0, rng.range(0, 6.28), 0); dm.scale.set(s * 0.9, s, s * 0.9); dm.updateMatrix();
-          im.setMatrixAt(k, dm.matrix); im.setColorAt(k, c.setHSL(rng.range(0.13, 0.22), rng.range(0.35, 0.55), rng.range(0.42, 0.66))); k++;
+          im.setMatrixAt(k, dm.matrix); im.setColorAt(k, c.setHSL(rng.range(0.15, 0.25), rng.range(0.35, 0.6), rng.range(0.46, 0.64))); k++;
         }
       }
       im.count = k; scene.add(im);

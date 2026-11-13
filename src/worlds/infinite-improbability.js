@@ -135,8 +135,8 @@ export default {
       [0.62, ['#f0d8a0', '#e0b070', '#a8d0f0', '#f0b8b0'], 6.3],      // clocks
       [0.70, ['#c0f0d8', '#d8c8f8', '#ffc8dc', '#e4e8f0'], 7.1],      // stairs
       [0.80, ['#c8dcff', '#f0e0ff', '#ffe8d0', '#d8f4f0'], 8.0],      // the long fall
-      [0.90, ['#eef0f4', '#eef0f4', '#eef0f4', '#eef0f4'], 8.0],      // normality
-      [1.01, ['#eef0f4', '#eef0f4', '#eef0f4', '#eef0f4'], 8.0],
+      [0.90, ['#b4c0d4', '#ccd4e2', '#bcc8dc', '#d6dce8'], 8.0],      // normality
+      [1.01, ['#b4c0d4', '#ccd4e2', '#bcc8dc', '#d6dce8'], 8.0],
     ].map(([u, c, st]) => ({ u, c: c.map((h) => new THREE.Color(h)), st }));
     const tunU = { uTime: { value: 0 }, uCalm: { value: 0 }, uStyle: { value: 0 }, uC1: { value: new THREE.Color() }, uC2: { value: new THREE.Color() }, uC3: { value: new THREE.Color() }, uC4: { value: new THREE.Color() } };
     const tunGeo = keep(new THREE.CylinderGeometry(TUNNEL_R, TUNNEL_R, 2800, 56, 80, true)); tunGeo.rotateX(Math.PI / 2);
@@ -256,7 +256,7 @@ export default {
       co.add(1.5, 2.8, 1.5, -11.5, -2.5, 70, '#e0b060', Math.PI, 0, 0); sp.add(1.9, 1.7, 1.9, -11.5, -0.7, 70, '#fff4e0').add(1.4, 1.2, 1.4, -11.5, 0.3, 70, '#f8b8cc');
       bx.add(0.25, 1.6, 0.25, -11.0, 0.5, 70.3, '#5a3a22', 0, 0, -0.4);
       // the beach: sand sloping to the water, with parasols, towels, castles and a ball
-      bx.add(15, 0.5, 230, 0.2, -10.3, 0, '#ead9a6', 0, 0, -0.15);
+      bx.add(15, 0.5, 230, 0.2, -10.3, 0, '#cdb67c', 0, 0, -0.15);
       const sandY = (x) => -10.05 - 0.151 * (x - 0.2);
       for (let i = 0; i < 16; i++) { const x = rng.range(-6.2, -3.2), z = -105 + i * 14 + rng.range(-4, 4), ys = sandY(x), c = BUNT[i % 5];
         cy.add(0.08, 2.4, 0.08, x, ys + 1.2, z, '#ffffff'); co.add(3.2, 0.7, 3.2, x, ys + 2.5, z, c);
@@ -305,7 +305,7 @@ export default {
         let y = -10.6; const dx = Math.max(0, x - 44) / 92, dz = Math.max(0, Math.abs(z) - 95) / 55;
         y -= dx * dx * 78 + dz * dz * 55;
         seaBase[i * 3] = x; seaBase[i * 3 + 1] = y; seaBase[i * 3 + 2] = z; pos.setXYZ(i, x, y, z);
-        const fall = clamp01(dx * dx * 1.4 + dz * dz * 1.4); _c.copy(shallow).lerp(deep, clamp01((x - 2) / 30)).lerp(foam, fall); if (x < 5) _c.lerp(foam, 0.7);
+        const fall = clamp01(dx * dx * 1.4 + dz * dz * 1.4); _c.copy(shallow).lerp(deep, clamp01((x - 2) / 30)).lerp(foam, fall); if (x < 5) _c.lerp(foam, 0.3);
         col[i * 3] = _c.r; col[i * 3 + 1] = _c.g; col[i * 3 + 2] = _c.b;
       }
       seaGeo.setAttribute('color', new THREE.BufferAttribute(col, 3)); seaGeo.computeVertexNormals();
@@ -502,9 +502,9 @@ export default {
     }
     const duckWorld = new THREE.Group(); duckWorld.position.set(60, -16, -1200); duckWorld.rotation.set(0.1, -0.5, 0.18); scene.add(duckWorld);
     const duck = makeDuck(26); duckWorld.add(duck);
-    mesh(duckWorld, SPH_HI, keep(new THREE.MeshBasicMaterial({ color: '#fff4a0', transparent: true, opacity: 0.12, side: THREE.BackSide, blending: THREE.AdditiveBlending, depthWrite: false })), 76, 70, 84, 0, 4, 2);
+    mesh(duckWorld, SPH_HI, keep(new THREE.MeshBasicMaterial({ color: '#fff4a0', transparent: true, opacity: 0.07, side: THREE.BackSide, blending: THREE.AdditiveBlending, depthWrite: false })), 66, 62, 72, 0, 4, 2);
     const duckRing = new THREE.Group(); duckRing.rotation.set(0.22, 0, -0.12); duckWorld.add(duckRing);
-    mesh(duckRing, keep(new THREE.RingGeometry(36, 56, 72, 1)), keep(new THREE.MeshBasicMaterial({ color: '#bfeaff', transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false })), 1, 1, 1, 0, 0, 0, -Math.PI / 2);
+    mesh(duckRing, keep(new THREE.RingGeometry(36, 56, 72, 1)), keep(new THREE.MeshBasicMaterial({ color: '#bfeaff', transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false })), 1, 1, 1, 0, 0, 0, -Math.PI / 2);
     {
       const bub = batch(SPH, keep(new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.05, metalness: 0.2, transparent: true, opacity: 0.45, depthWrite: false })));
       for (let i = 0; i < 260; i++) { const r = rng.range(36, 56), a = rng() * TAU, s = rng.range(0.5, 2.6); bub.add(s, s, s, Math.cos(a) * r, rng.range(-1.5, 2.5), Math.sin(a) * r, rng.pick(['#ffffff', '#e8f8ff', '#ffe8f8', '#f0ffe8'])); }
@@ -534,7 +534,7 @@ export default {
     {
       const STONE = ['#c8b48a', '#b89a70', '#d8c8a0'];
       for (let i = 0; i < 10; i++) {
-        const side = i % 2 ? 1 : -1, r = rng.range(2.6, 5), g = new THREE.Group(), rad = rng.range(13, 30), ang = rng.range(-0.9, 0.9);
+        const side = i % 2 ? 1 : -1, r = rng.range(4.5, 8), g = new THREE.Group(), rad = rng.range(20, 38), ang = rng.range(-0.9, 0.9);
         g.position.set(side * rad * Math.cos(ang), rad * Math.sin(ang), -1290 - i * 12 + rng.range(-3, 3)); g.rotation.set(rng.range(-0.25, 0.25), side > 0 ? Math.PI + rng.range(-0.5, 0.5) : rng.range(-0.5, 0.5), rng.range(-0.2, 0.2));
         const stretch = rng.range(1.1, 1.7);
         mesh(g, clockGeo(r, stretch), std({ map: keep(clockTexture(rng.int(1, 12), rng.int(0, 59))), alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.35 }), 1, 1, 1, 0, 0.04, 0);
@@ -580,7 +580,7 @@ export default {
         right.crossVectors(fwd, up).normalize(); back.copy(fwd).negate(); q.setFromRotationMatrix(mb.makeBasis(right, up, back));
         return { place, q: q.clone() };
       }
-      const base = new THREE.Vector3(-44, -48, -1436), f0 = new THREE.Vector3(0.35, 0, -1).normalize(), u0 = new THREE.Vector3(0, 1, 0);
+      const base = new THREE.Vector3(-42, -38, -1452), f0 = new THREE.Vector3(0.35, 0, -1).normalize(), u0 = new THREE.Vector3(0, 1, 0);
       const trunk = flight(base, f0, u0, 30, 6, 0, 0, '#b8323c');
       sb.addQ(8, 0.2, 5, trunk.place(0, -0.05, 2.2), trunk.q, '#f4efe4');
       const YAW0 = [-1.0, -0.5, 0, 0.5, 1.0], YAWR = [0.045, -0.035, 0.012, 0.05, -0.04], ROLLR = [0.03, -0.05, 0.07, -0.02, 0.045], CARPET = ['#2a62b8', '#2f7a4a', '#b8323c', '#e0a82a', '#6a3f8a'];
@@ -623,11 +623,11 @@ export default {
     // 10. THE SHIP: a white prow across the tunnel, a door that sighs open, and inside a plain white corridor (normality)
     // =====================================================================================================================
     const ship = new THREE.Group(); scene.add(ship);
-    const HULL = std({ color: '#f3f4f6', roughness: 0.4 });
+    const HULL = std({ color: '#e4e8ee', roughness: 0.4 });
     let doorL, doorR, innerL, innerR, doorGlow;
     {
       const bx = batch(BOX, WHITE), cy = batch(CYL, WHITE), glb = batch(BOX, GLOW), gs = batch(SPH, GLOW);
-      const W = '#f3f4f6', TRIM = '#c9ced6', PANEL = '#e6e9ee', LOW = '#cfd8e2', STRIP = [1.5, 1.6, 1.7], CYAN = [0.4, 1.5, 1.7];
+      const W = '#dfe3e9', TRIM = '#b4bcc8', PANEL = '#d2d8e0', LOW = '#b9c6d4', STRIP = [1.05, 1.1, 1.15], CYAN = [0.4, 1.5, 1.7];
       const Z0 = MOUTH_Z, L = 222, ZC = Z0 - 2 - L / 2;
       // the prow: a flat face with the doorway in it, a cone of hull behind, then the hull itself
       bx.add(15, 44, 2, -14.5, 0, Z0 - 1, W).add(15, 44, 2, 14.5, 0, Z0 - 1, W).add(14, 14.5, 2, 0, 14.75, Z0 - 1, W).add(14, 15.5, 2, 0, -14.25, Z0 - 1, W);
@@ -660,7 +660,7 @@ export default {
           } else if (i % 4 === 3) { for (let k = 0; k < 6; k++) bx.add(0.1, 0.12, 3.4, s * 6.9, -5.4 + k * 0.32, zc, '#8fa0b4', 0, 0, s * 0.5); }      // a vent
           else if (i % 4 === 0 && s < 0) { cy.add(3, 0.2, 3, s * 6.9, 3.2, zc, TRIM, 0, 0, Math.PI / 2); glb.add(0.1, 2.4, 2.4, s * 6.84, 3.2, zc, [0.9, 0.75, 0.95]); }      // a port
         }
-        if (i % 2) glb.add(3.2, 0.08, 5, 0, 7.46, zc, [1.7, 1.75, 1.8]); else gs.add(0.9, 0.2, 0.9, 0, 7.42, zc, [1.7, 1.7, 1.5]);
+        if (i % 2) glb.add(3.2, 0.08, 5, 0, 7.46, zc, [1.15, 1.18, 1.22]); else gs.add(0.9, 0.2, 0.9, 0, 7.42, zc, [1.2, 1.2, 1.1]);
       }
       // pipes along the upper corners, a handrail each side
       for (const [x, y, r, c] of [[-6.2, 6.3, 0.5, '#e0a82a'], [-5.5, 6.75, 0.3, '#c9ced6'], [6.3, 6.4, 0.42, '#7fb0d0'], [5.6, 6.8, 0.26, '#c9ced6']]) cy.add(r, L, r, x, y, ZC, c, Math.PI / 2, 0, 0);
@@ -684,7 +684,7 @@ export default {
       doorL = leaf(Z0 - 1); doorR = leaf(Z0 - 1); innerL = leaf(Z0 - 2 - 8 * BAY); innerR = leaf(Z0 - 2 - 8 * BAY);
       for (const d of [doorL, innerL]) d.children[3].position.x = 3.35; for (const d of [doorR, innerR]) d.children[3].position.x = -3.35;
       doorGlow = keep(new THREE.MeshBasicMaterial({ color: '#40ff90' })); mesh(ship, BOX, doorGlow, 4, 0.3, 0.3, 0, 8.6, Z0 + 0.5);
-      for (const z of [Z0 - 40, Z0 - 110, Z0 - 180]) { const pl = new THREE.PointLight(0xeaf4ff, 70, 90, 2); pl.position.set(0, 5, z); ship.add(pl); }
+      for (const z of [Z0 - 40, Z0 - 110, Z0 - 180]) { const pl = new THREE.PointLight(0xeaf4ff, 14, 90, 2); pl.position.set(0, 5, z); ship.add(pl); }
     }
     await ctx.yield();
 

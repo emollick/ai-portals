@@ -64,7 +64,7 @@ function paintHide(rng) {
   c.width = W; c.height = H; b.width = W; b.height = H;
   const g = c.getContext('2d'), q = b.getContext('2d');
   const row = g.createLinearGradient(0, 0, 0, H);
-  for (const [t, col] of [[0, '#8a8d90'], [0.1, '#6c7279'], [0.22, '#4a525c'], [0.5, '#353c45'], [0.78, '#4a525c'], [0.9, '#6c7279'], [1, '#8a8d90']]) row.addColorStop(t, col);
+  for (const [t, col] of [[0, '#a9aaa8'], [0.1, '#878c92'], [0.22, '#656e79'], [0.5, '#4e5863'], [0.78, '#656e79'], [0.9, '#878c92'], [1, '#a9aaa8']]) row.addColorStop(t, col);
   g.fillStyle = row; g.fillRect(0, 0, W, H);
   q.fillStyle = '#808080'; q.fillRect(0, 0, W, H);
   const both = (y, f) => { f(y); f(H - y); };      // the two flanks are painted alike enough, not mirror-true
@@ -81,7 +81,7 @@ function paintHide(rng) {
   // the wrinkled hide aft of the head: long shallow furrows
   for (let i = 0; i < 150; i++) {
     const y0 = rng() * H, x0 = W * (0.3 + rng() * 0.12), x1 = W * (0.7 + rng() * 0.27), a = 2 + rng() * 5, f = 0.01 + rng() * 0.02, ph = rng() * 9;
-    g.strokeStyle = `rgba(14,18,24,${0.14 + rng() * 0.2})`; g.lineWidth = 0.8 + rng() * 1.4; q.strokeStyle = `rgba(40,40,40,${0.35 + rng() * 0.3})`; q.lineWidth = 1.5 + rng() * 2;
+    g.strokeStyle = `rgba(14,18,24,${0.06 + rng() * 0.1})`; g.lineWidth = 0.8 + rng() * 1.4; q.strokeStyle = `rgba(40,40,40,${0.3 + rng() * 0.3})`; q.lineWidth = 1.5 + rng() * 2;
     for (const ctx of [g, q]) { ctx.beginPath(); for (let x = x0; x <= x1; x += 8) { const y = y0 + Math.sin(x * f + ph) * a; if (x === x0) ctx.moveTo(x, y); else ctx.lineTo(x, y); } ctx.stroke(); }
   }
   // scars: the long scratches of old fights, rakes of parallel teeth, the rings left by squid
@@ -118,14 +118,14 @@ function buildWhale(rng) {
   const fb = spline(KS, [1.10, 1.28, 1.42, 1.66, 1.85, 1.50, 1.00, 0.60, 0.32, 0.20]);
   const NS = 84, NT = 48;
   const prof = (s) => {
-    const cap = s < 0.05 ? Math.sqrt(Math.max(0, 1 - (1 - s / 0.05) ** 2)) : s > 0.985 ? Math.sqrt(Math.max(0, (1 - s) / 0.015)) : 1;
+    const cap = s < 0.075 ? Math.pow(Math.max(0, 1 - (1 - s / 0.075) ** 2), 0.42) : s > 0.985 ? Math.sqrt(Math.max(0, (1 - s) / 0.015)) : 1;
     let bump = 0.32 * Math.exp(-(((s - 0.635) / 0.035) ** 2));                      // the hump
     for (let k = 0; k < 5; k++) bump += (0.13 - k * 0.015) * Math.exp(-(((s - 0.72 - k * 0.043) / 0.011) ** 2));   // the knuckles behind it
-    return { w: fw(s) * cap, ht: ft(s) * cap, hb: fb(s) * cap, n: 3.3 - 1.3 * sm(0.18, 0.5, s), yc: 0.22 * (1 - sm(0, 0.4, s)), z: L / 2 - s * L, bump: bump * cap };
+    return { w: fw(s) * cap, ht: ft(s) * cap, hb: fb(s) * cap, n: 3.3 - 1.3 * sm(0.18, 0.5, s) - 0.9 * (1 - sm(0, 0.07, s)), yc: 0.22 * (1 - sm(0, 0.4, s)), z: L / 2 - s * L, bump: bump * cap };
   };
   const bodyGeo = loft(prof, NS, NT), base = bodyGeo.attributes.position.array.slice();
   const hide = paintHide(rng);
-  const skin = new THREE.MeshStandardMaterial({ map: hide.map, bumpMap: hide.bump, bumpScale: 2.2, roughness: 0.42, metalness: 0.0 });
+  const skin = new THREE.MeshStandardMaterial({ map: hide.map, bumpMap: hide.bump, bumpScale: 1.5, roughness: 0.42, metalness: 0.0 });
   const body = new THREE.Mesh(bodyGeo, skin); body.frustumCulled = false; group.add(body);
   const dark = new THREE.MeshStandardMaterial({ color: '#333a43', roughness: 0.5 });
   const pale = new THREE.MeshStandardMaterial({ color: '#cfccc2', roughness: 0.6 });
@@ -333,13 +333,14 @@ uniform float uFog, uTime;
 varying vec3 vW;
 ${NOISE}
 float crater(vec2 p, float cell, float seed, float dens){
-  vec2 g = p / cell, id = floor(g); float h = 0.0;
+  vec2 g = p / cell; g += 0.085 * (vec2(vn(g * 2.7 + seed), vn(g * 2.7 + seed + 7.3)) - 0.5) + 0.02 * (vec2(vn(g * 11.0), vn(g * 11.0 + 3.1)) - 0.5);
+  vec2 id = floor(g); float h = 0.0;
   for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
     vec2 c = id + vec2(float(i), float(j)); vec2 r = h22(c + seed);
     float has = step(1.0 - dens, h12(c * 1.7 + seed + 3.1));
     float rad = 0.16 + 0.27 * h12(c + seed + 9.7), d = length(g - (c + 0.5 + (r - 0.5) * 0.55)) / rad;
     float bowl = d < 1.0 ? -(1.0 - d * d) * 0.34 : 0.0;
-    float rim = exp(-(d - 1.0) * (d - 1.0) / 0.022) * 0.14 + exp(-max(d - 1.0, 0.0) * 2.6) * 0.05 * step(1.0, d);
+    float rim = exp(-(d - 1.0) * (d - 1.0) / 0.022) * 0.14 + exp(-max(d - 1.0, 0.0) * 2.6) * 0.05 * (1.0 - smoothstep(1.6, 2.2, d));      // (the thrown blanket: continuous across the rim and gone before the cells run out, or a low sun draws every seam)
     float peak = exp(-d * d / 0.012) * 0.1 * step(0.36, rad);
     h += has * (bowl + rim + peak) * rad;
   }
@@ -358,11 +359,11 @@ vec2 toField(vec2 p){ vec2 v = p - uField; return vec2(v.x * uFieldRot.x + v.y *
 float height(vec2 p, float dist, float belt){
   float h = (fbm(p / 9000.0) - 0.5) * 520.0 + ridge(p / 3400.0 + 2.0) * 300.0 * belt;
   float dn = smoothstep(0.34, 0.66, fbm(p / 6500.0 + 44.0));
-  h += crater(p, 2700.0, 1.0, 0.5);
+  h += crater(p, 2700.0, 1.0, 0.36) * 0.62;
   float m = 1.0 - smoothstep(-60.0, 160.0, fieldD(toField(p)));
   h = mix(h, 30.0, m * 0.95);
-  h += crater(p, 830.0, 7.0, mix(0.1, 0.62, dn)) * (1.0 - smoothstep(10000.0, 24000.0, dist));
-  if (dist < 8000.0) h += crater(p, 230.0, 13.0, mix(0.05, 0.5, dn)) * (1.0 - smoothstep(3500.0, 8000.0, dist)) * (1.0 - 0.6 * m);
+  h += crater(p, 830.0, 7.0, mix(0.08, 0.5, dn)) * (1.0 - smoothstep(10000.0, 24000.0, dist));
+  if (dist < 8000.0) h += crater(p, 230.0, 13.0, mix(0.04, 0.4, dn)) * (1.0 - smoothstep(3500.0, 8000.0, dist)) * (1.0 - 0.6 * m);
   return h;
 }
 float bandf(float x, float a, float b){ return smoothstep(a - 1.5, a + 1.5, x) * (1.0 - smoothstep(b - 1.5, b + 1.5, x)); }
@@ -383,23 +384,23 @@ void main(){
   // the landing field: slabs, joints, cracks, what is left of its paint, and the dust that has drifted over it
   vec2 q = toField(p); float fd = fieldD(q);
   float drift = smoothstep(0.40, 0.66, fbm(p / 430.0 + 3.0));
-  float fm = (1.0 - smoothstep(-10.0, 10.0, fd)) * (1.0 - drift * 0.88);
+  float fm = (1.0 - smoothstep(-10.0, 10.0, fd)) * (1.0 - drift * 0.62);
   if (fd < 40.0) {
-    vec3 conc = vec3(0.36, 0.345, 0.32) * (0.8 + 0.4 * vn(floor(q / 60.0) * 3.7)) * (0.9 + 0.2 * vn(q / 9.0));
+    vec3 conc = vec3(0.30, 0.295, 0.29) * (0.8 + 0.4 * vn(floor(q / 60.0) * 3.7)) * (0.9 + 0.2 * vn(q / 9.0));
     vec2 jg = (0.5 - abs(fract(q / 60.0) - 0.5)) * 60.0;
     float near = 1.0 - smoothstep(2500.0, 7000.0, dist);
     conc *= 1.0 - 0.45 * (1.0 - smoothstep(1.0, 3.2, min(jg.x, jg.y))) * near;
     conc *= 1.0 - 0.4 * (1.0 - smoothstep(0.0, 0.03, abs(fbm(q / 150.0 + 2.0) - 0.5)));
-    float wear = smoothstep(0.34, 0.62, fbm(q / 95.0 + 11.0));
+    float wear = 0.35 + 0.65 * smoothstep(0.3, 0.58, fbm(q / 95.0 + 11.0));
     float r0 = length(q), r1 = length(q - PAD1), r2 = length(q - PAD2);
-    float mk = bandf(r0, 300.0, 314.0) + bandf(r0, 120.0, 128.0) + bandf(r1, 236.0, 250.0) + bandf(r1, 96.0, 104.0) + bandf(r2, 196.0, 210.0) + bandf(r2, 80.0, 88.0);
+    float mk = bandf(r0, 296.0, 318.0) + bandf(r0, 116.0, 130.0) + bandf(r1, 230.0, 252.0) + bandf(r1, 92.0, 106.0) + bandf(r2, 190.0, 212.0) + bandf(r2, 76.0, 90.0);
     mk += (1.0 - smoothstep(3.0, 5.0, min(abs(q.x - PAD1.x), abs(q.y - PAD1.y)))) * step(r1, 96.0);
     mk += (1.0 - smoothstep(3.0, 5.0, min(abs(q.x - PAD2.x), abs(q.y - PAD2.y)))) * step(r2, 80.0);
     float ang = atan(q.y, q.x); mk += step(0.93, cos(ang * 12.0)) * bandf(r0, 314.0, 372.0);
     float onStrip = step(760.0, q.x) * step(abs(q.y), 58.0);
-    mk += onStrip * ((1.0 - smoothstep(1.6, 3.0, abs(q.y))) * step(0.5, fract(q.x / 130.0)) + (1.0 - smoothstep(1.6, 3.0, abs(abs(q.y) - 49.0))));
+    mk += onStrip * ((1.0 - smoothstep(3.0, 5.0, abs(q.y))) * step(0.5, fract(q.x / 130.0)) + (1.0 - smoothstep(2.5, 4.5, abs(abs(q.y) - 49.0))));
     mk += onStrip * step(abs(fract(q.x / 650.0) - 0.5), 0.03) * step(abs(q.y), 40.0) * step(0.4, fract(q.y / 12.0));
-    conc = mix(conc, vec3(0.78, 0.66, 0.34), clamp(mk, 0.0, 1.0) * wear * 0.75 * (1.0 - smoothstep(6000.0, 12000.0, dist)));
+    conc = mix(conc, vec3(0.95, 0.80, 0.38), clamp(mk, 0.0, 1.0) * wear * 0.9 * (1.0 - smoothstep(6000.0, 12000.0, dist)));
     alb = mix(alb, conc, fm);
   }
   // light: two low suns, the sky's blue from above; the ruin's long shadows
@@ -411,7 +412,7 @@ void main(){
     sh = max(sh, (1.0 - smoothstep(wdt * 0.75, wdt * 1.25, dd)) * (1.0 - 0.45 * t));
   }
   float d1 = max(dot(N, uSun1), 0.0), d2 = max(dot(N, uSun2), 0.0);
-  vec3 light = vec3(0.10, 0.12, 0.20) * (0.6 + 0.4 * N.y) + uSunC1 * pow(d1, 0.9) * 3.1 * (1.0 - 0.9 * sh) + uSunC2 * d2 * 1.5 * (1.0 - 0.6 * sh);
+  vec3 light = vec3(0.19, 0.19, 0.27) * (0.6 + 0.4 * N.y) + uSunC1 * 0.12 + uSunC1 * pow(d1, 0.9) * 3.0 * (1.0 - 0.78 * sh) + uSunC2 * d2 * 1.5 * (1.0 - 0.6 * sh);
   vec3 col = alb * light;
   float f = dist * uFog; f = 1.0 - exp(-f * f);
   col = mix(col, uHaze, clamp(f + 0.06 * smoothstep(2000.0, 12000.0, dist), 0.0, 1.0));
@@ -447,7 +448,7 @@ void main(){
 function softTexture(blobs, rng) {
   const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
   for (let i = 0; i < blobs; i++) {
-    const x = blobs === 1 ? 64 : 34 + rng() * 60, y = blobs === 1 ? 64 : 48 + rng() * 34, r = blobs === 1 ? 64 : 18 + rng() * 26;
+    const x = blobs === 1 ? 64 : 22 + rng() * 84, y = blobs === 1 ? 64 : 54 + rng() * 24 - Math.abs(x - 64) * 0 , r = blobs === 1 ? 64 : 10 + rng() * 14;
     const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(255,255,255,0.75)'); gr.addColorStop(0.5, 'rgba(255,255,255,0.3)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
     g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
   }
@@ -493,7 +494,8 @@ export default {
     scene.add(new THREE.HemisphereLight(new THREE.Color('#9fb0e0'), new THREE.Color('#b08458'), Math.PI * 0.85));
     const mkDir = (col, k, dir) => { const d = new THREE.DirectionalLight(col, Math.PI * k); d.position.copy(dir).multiplyScalar(1000); scene.add(d, d.target); return d; };
     mkDir(new THREE.Color('#ffdcae'), 1.25, SUN1); mkDir(new THREE.Color('#ff8a5e'), 0.5, SUN2);
-    mkDir(new THREE.Color('#c9a27a'), 0.22, new THREE.Vector3(-SUN1.x, -0.6, -SUN1.z));      // the lit dust below, shining up under the belly
+    mkDir(new THREE.Color('#c9a27a'), 0.3, new THREE.Vector3(-SUN1.x, -0.6, -SUN1.z));
+    const fill = mkDir(new THREE.Color('#b9c4e6'), 0.42, new THREE.Vector3(0, 1, 0));      // the sky's own light, kept on the side of the whale that we see      // the lit dust below, shining up under the belly
     await ctx.yield();
 
     // ---- the ground and the ruined field, 1.9 km on past the exit ----
@@ -519,7 +521,7 @@ export default {
       const beaconTex = softTexture(1, rng), beacon = new THREE.Sprite(new THREE.SpriteMaterial({ map: beaconTex, color: new THREE.Color(4, 0.5, 0.3), blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); beacon.scale.setScalar(70); at(beacon, -536, -266, 320); ruin.userData.beacon = beacon; ruin.userData.beaconTex = beaconTex; }
     for (let i = 0; i < 6; i++) {      // the hangar vaults
       const len = 260 * (i === 2 ? 0.45 : i === 4 ? 0.7 : 1), v = new THREE.Mesh(new THREE.CylinderGeometry(88, 88, len, 20, 1, true, 0, Math.PI), shell);
-      v.rotation.set(0, -fAng + Math.PI / 2, Math.PI / 2); const w = at(v, -560 + i * 215, 560 + (260 - len) * 0.5, -6 - RR() * 14); if (i % 2 === 0) cast(w[0], w[1], 80, 120);
+      v.rotation.set(0, -fAng + Math.PI / 2, Math.PI / 2); const w = at(v, -560 + i * 215, 560 + (260 - len) * 0.5, -6 - RR() * 14); if (i % 2 === 0) cast(w[0], w[1], 70, 95);
     }
     for (let i = 0; i < 9; i++) {      // gantries along the strip
       const h = 150 + RR() * 110, fallen = RR() < 0.4, g = new THREE.Mesh(new THREE.BoxGeometry(11, h, 11), rust);
@@ -527,12 +529,12 @@ export default {
       if (fallen) { g.rotation.set(Math.PI / 2 - 0.06, RR() * 3, 0); at(g, qx, qy, 8); } else { g.rotation.set((RR() - 0.5) * 0.12, RR(), (RR() - 0.5) * 0.12); const w = at(g, qx, qy, h / 2); cast(w[0], w[1], h, 9);
         const arm = new THREE.Mesh(new THREE.BoxGeometry(70, 7, 7), rust); arm.rotation.y = RR() * 3; at(arm, qx, qy, h * 0.86); }
     }
-    { const hull = new THREE.Mesh(new THREE.CapsuleGeometry(34, 250, 8, 18), stone); hull.rotation.set(0, -fAng + 0.6, Math.PI / 2 - 0.05); const w = at(hull, 450, -930, 26); cast(w[0], w[1], 62, 130);
+    { const hull = new THREE.Mesh(new THREE.CapsuleGeometry(34, 250, 8, 18), stone); hull.rotation.set(0, -fAng + 0.6, Math.PI / 2 - 0.05); const w = at(hull, 450, -930, 26); cast(w[0], w[1], 60, 48);
       for (let k = 0; k < 3; k++) { const fin = new THREE.Mesh(new THREE.BoxGeometry(6, 70, 46), rust); fin.rotation.set(k * 2.1, -fAng + 0.6, 0); at(fin, 450 - 110 * Math.cos(0.6), -930 + 110 * Math.sin(0.6), 30); }
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(430, 17, 10, 60, Math.PI * 0.83), stone); ring.rotation.set(0, -fAng + 1.1, 0); const w2 = at(ring, -250, 930, -40); cast(w2[0], w2[1], 380, 150);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(430, 17, 10, 60, Math.PI * 0.83), stone); ring.rotation.set(0, -fAng + 1.1, 0); const w2 = at(ring, -250, 930, -40); cast(w2[0], w2[1], 380, 34);
       const stub = new THREE.Mesh(new THREE.TorusGeometry(430, 17, 10, 14, Math.PI * 0.12), stone); stub.rotation.set(Math.PI / 2, 0, 0.4); at(stub, 40, 1180, 6); }
-    { const junk = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), rust, 150), M = new THREE.Matrix4(), Q = new THREE.Quaternion(), E = new THREE.Euler(), V = new THREE.Vector3(), SC = new THREE.Vector3();
-      for (let i = 0; i < 150; i++) { const w = fieldToWorld((RR() - 0.35) * 3200, (RR() - 0.5) * 2100); V.set(w[0], 30 + RR() * 6, w[1]); E.set(RR() * 0.6, RR() * 6, RR() * 0.6); Q.setFromEuler(E); SC.set(6 + RR() * 40, 4 + RR() * 22, 6 + RR() * 30); junk.setMatrixAt(i, M.compose(V, Q, SC)); }
+    { const junk = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), rust, 64), M = new THREE.Matrix4(), Q = new THREE.Quaternion(), E = new THREE.Euler(), V = new THREE.Vector3(), SC = new THREE.Vector3();
+      for (let i = 0; i < 64; i++) { const w = fieldToWorld((RR() - 0.35) * 3000, (RR() - 0.5) * 1900); V.set(w[0], 31, w[1]); E.set(RR() * 0.12, RR() * 6, RR() * 0.12); Q.setFromEuler(E); SC.set(8 + RR() * 34, 2 + RR() * 7, 6 + RR() * 22); junk.setMatrixAt(i, M.compose(V, Q, SC)); }
       ruin.add(junk); }
     await ctx.yield();
 
@@ -544,11 +546,11 @@ export default {
         vertexShader: WORLD_VERT, fragmentShader: DECK_FRAG, transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false });
       const d = new THREE.Mesh(new THREE.PlaneGeometry(100000, 100000).rotateX(-Math.PI / 2), m); d.position.set(CX, y, 0); d.frustumCulled = false; d.renderOrder = 2 + i; scene.add(d); deckMats.push(m);
     });
-    const puffTex = softTexture(7, R2('puff')), puffTex2 = softTexture(5, R2('puff2')), wispTex = softTexture(1, rng);
-    const puffMats = [puffTex, puffTex2].map((t) => new THREE.SpriteMaterial({ map: t, color: new THREE.Color(1.0, 0.84, 0.66), transparent: true, opacity: 0.5, depthWrite: false }));
-    { const CR = R2('clouds'), n = Math.round(240 * Math.min(1.3, Math.max(0.5, detail)));
+    const puffTex = softTexture(26, R2('puff')), puffTex2 = softTexture(18, R2('puff2')), wispTex = softTexture(1, rng);
+    const puffMats = [puffTex, puffTex2].map((t) => new THREE.SpriteMaterial({ map: t, color: new THREE.Color(1.0, 0.84, 0.66), transparent: true, opacity: 0.3, depthWrite: false }));
+    { const CR = R2('clouds'), n = Math.round(150 * Math.min(1.3, Math.max(0.5, detail)));
       for (let i = 0; i < n; i++) {
-        const a = CR() * TAU, r = 300 + Math.sqrt(CR()) * 7500, w = 280 + CR() * 760, h = w * (0.28 + CR() * 0.2), y = DECKS[i % 4] + h * 0.25 + CR() * 40;
+        const a = CR() * TAU, r = 300 + Math.sqrt(CR()) * 7500, w = 380 + CR() * 900, h = w * (0.2 + CR() * 0.12), y = DECKS[i % 4] + h * 0.25 + CR() * 40;
         const x = CX + Math.cos(a) * r, z = Math.sin(a) * r;
         if (path.distanceTo(x, y, z) < w * 0.5 + 110) continue;
         const s = new THREE.Sprite(puffMats[i % 2]); s.position.set(x, y, z); s.scale.set(w, h, 1); s.renderOrder = 6; scene.add(s);
@@ -584,8 +586,8 @@ export default {
     const put = (out, ahead, side, drop) => { out.copy(P).addScaledVector(Th, ahead).addScaledVector(Rt, side); out.y += drop; return out; };
     const whaleAt = (u, out) => { frame(u); const late = sm(0.66, 0.96, u);
       return put(out, 92 - 67 * sm(0.02, 0.32, u) + 62 * late, 22 - 15 * sm(0.05, 0.35, u) + 42 * late, -15 + 8 * sm(0.05, 0.35, u) - 46 * late); };
-    const bowlAt = (u, out) => { frame(u); const pass = sm(0.72, 0.9, u);
-      return put(out, 27 - 20.5 * sm(0.28, 0.58, u) - 15 * pass, -5 + 2.6 * sm(0.28, 0.58, u) + 0.85 * pass, -2.4 - 0.3 * sm(0.28, 0.58, u) + 1.9 * pass); };
+    const bowlAt = (u, out) => { frame(u); const pass = sm(0.7, 0.93, u);
+      return put(out, 27 - 20.5 * sm(0.28, 0.58, u) - 15 * pass, -5 + 2.6 * sm(0.28, 0.58, u) + 1.45 * pass, -2.4 - 0.3 * sm(0.28, 0.58, u) + 1.75 * pass); };
     const WP = new THREE.Vector3(), BP = new THREE.Vector3(), g1 = new THREE.Vector3(), g2 = new THREE.Vector3(), g3 = new THREE.Vector3();
     const pois = [
       { at: (time, u) => { frame(u); return put(g1, 2500, 0, -260); }, from: -0.6, to: 1.6, fade: 0.2, weight: 0.5, steady: true },
@@ -604,6 +606,7 @@ export default {
       whale.group.rotation.order = 'YXZ';
       whale.group.rotation.set(0.2 + 0.14 * Math.sin(time * 0.21) + 0.55 * sm(0.66, 0.96, uu), yawF + 1.3 + 0.22 * Math.sin(time * 0.13 + 1) - 0.7 * (uu - 0.5), 0.28 * Math.sin(time * 0.17 + 2) + 0.22);
       whale.update(time);
+      fill.position.copy(eye).sub(WP).normalize().multiplyScalar(1000); fill.position.y += 350;
       // the bowl: upright, more or less, turning
       bowlAt(uu, BP); bowl.group.position.copy(BP);
       bowl.group.rotation.set(0.32 * Math.sin(time * 0.5), time * 0.45, 0.28 * Math.cos(time * 0.41) + 0.12);
@@ -630,7 +633,7 @@ export default {
         s.position.copy(eye).add(r); const dist = r.length(); s.material.opacity = through ? 0 : d.k * sm(9, 34, dist) * (1 - sm(WB * 0.7, WB, dist)); }
       // the decks, as the eye goes through each
       let v = 0; for (const y of DECKS) { const dy = (eye.y - y) / 55; v = Math.max(v, Math.exp(-dy * dy)); }
-      veil.position.copy(eye); veil.material.opacity = through ? 0 : v * 0.5; veil.visible = v > 0.01 && !through;
+      veil.position.copy(eye); veil.material.opacity = through ? 0 : v * 0.36; veil.visible = v > 0.01 && !through;
       const bc = ruin.userData.beacon; if (bc) bc.material.opacity = 0.25 + 0.75 * Math.pow(Math.max(0, Math.sin(time * 1.4)), 12);
     }
 

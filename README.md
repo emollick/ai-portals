@@ -94,6 +94,37 @@ There are also 20 journeys, which fly a set of worlds in order: [One Drop of Wat
 
 The worlds are uneven, and the agents' own grading says so. Every world carries a band from 1 to 5: 40 of the 471 are in band 5 and 28 in band 1. The bands are what the picker uses to decide which worlds a visit opens with.
 
+## This fork: ten worlds from The Hitchhiker's Guide to the Galaxy
+
+This fork adds ten worlds imagined from Douglas Adams's books, and a journey, **Don't Panic**, that flies them in order (`?suite=dont-panic`). Each is one file in `src/worlds`, 550 to 1,100 lines, against about 3,000 for a typical world upstream: they are early drafts, written by Claude agents in parallel, one agent per world, and checked only by rendering two stills of each. Expect rough edges. The gallery has no thumbnails for them yet.
+
+To open one on its own from source: `npm start`, then `http://localhost:8000/?world=<id>`. To render stills of a world into `shots/` (needs [Playwright](https://playwright.dev) and the local server running): `node tools/shot.mjs <id>`. `vercel.json` deploys the site to Vercel with the repository's own build.
+
+<table>
+<tr>
+<td width="50%" valign="top"><img src="readme/hitchhikers/the-way-bricks-dont.png" alt="Slab-sided yellow ships hanging over green English fields" width="100%"><br><b>The Way Bricks Don't</b><br><sub><code>the-way-bricks-dont</code> · A Thursday lunchtime, and yellow ships hanging over the village.</sub></td>
+<td width="50%" valign="top"><img src="readme/hitchhikers/infinite-improbability.png" alt="A pastel tunnel with furniture and a rubber duck drifting in it" width="100%"><br><b>Infinite Improbability</b><br><sub><code>infinite-improbability</code> · A seafront, penguins and a sofa, on the way back to normality.</sub></td>
+</tr>
+<tr>
+<td valign="top"><img src="readme/hitchhikers/whale-and-petunias.png" alt="A sperm whale and a bowl of petunias falling above a cratered golden planet" width="100%"><br><b>A Whale and a Bowl of Petunias</b><br><sub><code>whale-and-petunias</code> · Falling beside both of them, several miles above Magrathea.</sub></td>
+<td valign="top"><img src="readme/hitchhikers/magrathea-factory-floor.png" alt="A half-built Earth in scaffolding inside a vast hangar, other planets on cradles beside it" width="100%"><br><b>The Factory Floor of Magrathea</b><br><sub><code>magrathea-factory-floor</code> · A hangar with its own weather, and a second Earth half built in it.</sub></td>
+</tr>
+<tr>
+<td valign="top"><img src="readme/hitchhikers/the-day-of-the-answer.png" alt="A vast crowd in a city square before a monumental building with a glowing doorway" width="100%"><br><b>The Day of the Answer</b><br><sub><code>the-day-of-the-answer</code> · Over the waiting crowd and in to Deep Thought, after 7.5 million years.</sub></td>
+<td valign="top"><img src="readme/hitchhikers/sundive.png" alt="A black ship in silhouette against a granulated orange sun" width="100%"><br><b>Sundive</b><br><sub><code>sundive</code> · A black stuntship dives into a sun for the loudest band in the galaxy.</sub></td>
+</tr>
+<tr>
+<td valign="top"><img src="readme/hitchhikers/total-perspective-vortex.png" alt="A sun with planets on orbit rings, a comet, and a spiral galaxy marked you are here" width="100%"><br><b>The Total Perspective Vortex</b><br><sub><code>total-perspective-vortex</code> · The whole of creation, and one dot that says you are here.</sub></td>
+<td valign="top"><img src="readme/hitchhikers/the-sky-over-krikkit.png" alt="A glowing trail rising from a lantern-lit hilltop into a black sky" width="100%"><br><b>The Sky over Krikkit</b><br><sub><code>the-sky-over-krikkit</code> · Up through the dust cloud of a starless world, into everything.</sub></td>
+</tr>
+<tr>
+<td valign="top"><img src="readme/hitchhikers/outside-the-asylum.png" alt="A house on a beach with its living room on the outside of its walls" width="100%"><br><b>Outside the Asylum</b><br><sub><code>outside-the-asylum</code> · A house built inside out, so that the whole world is the asylum.</sub></td>
+<td valign="top"><img src="readme/hitchhikers/letters-of-fire.png" alt="Giant burning letters along a mountain wall in a red desert at dusk" width="100%"><br><b>Letters of Fire</b><br><sub><code>letters-of-fire</code> · God's Final Message to His Creation, read along a mountain range.</sub></td>
+</tr>
+</table>
+
+The rest of this README describes the original site as published upstream at [emollick/ai-portals](https://github.com/emollick/ai-portals); its counts (471 worlds, 20 journeys) do not include these ten.
+
 ## How it was built
 
 Ethan Mollick described the idea in a paragraph in October 2026 and left the building to Claude; twenty hours later there were 204 worlds on a live website. By the tenth day there was a lead agent that owned the engine and shipped every release, and 28 teams of agents building worlds in parallel. Agents acting as judges scored the worlds, and those scores became the bands above. Before each release the lead agent's tools rendered every new world, and every world whose code had changed, at three points along its flight and checked the frames for errors and broken pixels; a world that failed was left out. Then they played the assembled site at ten times its normal speed before anything went live. Claude's own estimate, not a count, is that about 25,000 agents worked on the project. This README was written by Claude too, and other agents checked it against the code.
