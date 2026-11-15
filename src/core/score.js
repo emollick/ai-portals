@@ -9,7 +9,8 @@
 //   a few high glass notes, a strum to greet each world, and a rising wash of air as the portal comes near.
 // The kind of place sets the tempo, the progression and the lead's voice (CHAR); how light and how warm the world looks (its
 // registry `tone`, [light, warm]) sets the register and the brightness; a calm world plays slower and thinner. How far through the
-// world the flight is (0 to 1) shapes the piece: sparse on arrival, full in the middle, swelling into the portal, quiet on a pause.
+// world the flight is (0 to 1) shapes the piece: sparse on arrival, full in the middle, swelling into the portal. (A pause silences
+// all of the sound: audio.js pause().)
 import { mulberry } from './sound-layers.js';
 
 // One character per kind of place. prog: chords as scale degrees (0 is the world's root). lead: the voice of the melody.

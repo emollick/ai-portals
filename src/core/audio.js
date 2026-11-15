@@ -67,7 +67,7 @@ export function createAudio(opt = {}) {
   const im = new Float32Array(13); for (let n = 1; n <= 12; n++) im[n] = (n % 2 ? 1 : 0.55) / Math.pow(n, 1.5);
   const wave = ac.createPeriodicWave(new Float32Array(13), im);
 
-  let on = false, cur = null, group = null, offTimer = 0;
+  let on = false, cur = null, group = null, offTimer = 0, held = false, holdTimer = 0;
 
   // what a world sounds like: the preset of its kind of place, its key from its seed, its row of the table, and its own `audio` field last
   function config(W) {
@@ -141,10 +141,18 @@ export function createAudio(opt = {}) {
     // this world had running and puts the context to sleep
     toggle() {
       on = !on; const t = ac.currentTime; clearTimeout(offTimer);
-      master.gain.cancelScheduledValues(t); master.gain.setValueAtTime(master.gain.value, t); master.gain.linearRampToValueAtTime(on ? 1 : 0, t + (on ? 0.25 : 0.4));
-      if (on) { ac.resume(); if (!group) swap(); }
+      master.gain.cancelScheduledValues(t); master.gain.setValueAtTime(master.gain.value, t); master.gain.linearRampToValueAtTime(on && !held ? 1 : 0, t + (on ? 0.25 : 0.4));
+      if (on) { if (!held) ac.resume(); if (!group) swap(); }
       else offTimer = setTimeout(() => { if (on) return; if (group) group.dispose(); group = null; try { const p = ac.suspend(); if (p && p.catch) p.catch(() => {}); } catch (e) {} }, 600);
       return on;
+    },
+    // the visuals paused (true) or playing again (false): the sound fades out in 0.4 s and its clock stops, and comes back where it left off
+    pause(p) {
+      held = !!p; K.held = held; clearTimeout(holdTimer); if (!on) return held;
+      const t = ac.currentTime; master.gain.cancelScheduledValues(t); master.gain.setValueAtTime(master.gain.value, t); master.gain.linearRampToValueAtTime(held ? 0 : 1, t + (held ? 0.4 : 0.25));
+      if (!held) ac.resume();
+      else holdTimer = setTimeout(() => { if (!held || !on) return; try { const q = ac.suspend(); if (q && q.catch) q.catch(() => {}); } catch (e) {} }, 500);
+      return held;
     },
     // called at every world, and by the button with the world on screen (the antechamber too: its def.antechamber is true)
     world(W) { if (!W || !W.def || (W === cur && group)) return; cur = W; if (on) swap(); },

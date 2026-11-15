@@ -227,7 +227,7 @@ async function boot() {
   keepAwake(); document.addEventListener('visibilitychange', keepAwake); window.addEventListener('pointerdown', keepAwake, { passive: true });
 
   const bPause = $('b-pause');
-  const setPaused = (p) => { engine.settings.paused = p; bPause.classList.toggle('on', p); bPause.setAttribute('aria-label', p ? 'Play' : 'Pause'); keepAwake(); };
+  const setPaused = (p) => { engine.settings.paused = p; if (window.__audio) window.__audio.pause(p); bPause.classList.toggle('on', p); bPause.setAttribute('aria-label', p ? 'Play' : 'Pause'); keepAwake(); };
   bPause.onclick = () => setPaused(!engine.settings.paused);
   $('r-speed').value = engine.settings.speed; $('r-speed').oninput = (e) => { engine.settings.speed = Number(e.target.value); }; $('r-speed').onchange = () => save();   // the pace is remembered
   $('r-strange').value = engine.settings.strangeness; $('r-strange').oninput = (e) => { engine.settings.strangeness = Number(e.target.value); };
@@ -236,7 +236,7 @@ async function boot() {
   if (fsOn) $('b-full').onclick = full; else $('b-full').style.display = 'none';   // an iPhone has no fullscreen: add the page to the home screen instead
   const bSound = $('b-sound');
   const sound = async () => {
-    if (!window.__audio) { try { const m = await import('./core/audio.js'); window.__audio = m.createAudio({ progress: (W) => (W && engine.stats.id === W.def.id ? engine.stats.u : null), paused: () => engine.settings.paused }); window.__audio.world(engine.cur); } catch (e) { console.warn('audio unavailable', e); return; } }
+    if (!window.__audio) { try { const m = await import('./core/audio.js'); window.__audio = m.createAudio({ progress: (W) => (W && engine.stats.id === W.def.id ? engine.stats.u : null), paused: () => engine.settings.paused }); window.__audio.pause(engine.settings.paused); window.__audio.world(engine.cur); } catch (e) { console.warn('audio unavailable', e); return; } }
     const on = window.__audio.toggle(); bSound.classList.toggle('on', on); bSound.setAttribute('aria-label', on ? 'Sound off' : 'Sound on');
   };
   bSound.onclick = sound;
