@@ -1,9 +1,10 @@
-// Generative ambient sound: a slow pad, a bed (wind, water, room tone, or the still hum of space), sparse bells, and up to three
+// Generative ambient sound: the world's score (score.js; the antechamber keeps the old slow pad), a bed (wind, water, room tone, or the still hum of space), and up to three
 // layers chosen by what the world contains (rain, surf, birds ...: sound-layers.js; which world gets what: sound-table.js, made from
 // design/sound.json). Re-tuned for every world and crossed at equal power at each portal. Off until the viewer turns it on, and
 // nothing of this is loaded before that.
 import { SOUND } from './sound-table.js';
 import { makeKit, makeGroup, BEDS, LAYERS, mulberry } from './sound-layers.js';
+import { score } from './score.js';
 
 const SCALES = {
   pentatonic: [0, 2, 4, 7, 9], lydian: [0, 2, 4, 6, 7, 9, 11], major: [0, 2, 4, 5, 7, 9, 11], dorian: [0, 2, 3, 5, 7, 9, 10],
@@ -66,7 +67,7 @@ export function createAudio(opt = {}) {
   const im = new Float32Array(13); for (let n = 1; n <= 12; n++) im[n] = (n % 2 ? 1 : 0.55) / Math.pow(n, 1.5);
   const wave = ac.createPeriodicWave(new Float32Array(13), im);
 
-  let on = false, cur = null, group = null, offTimer = 0;
+  let on = false, cur = null, group = null, offTimer = 0, held = false, holdTimer = 0;
 
   // what a world sounds like: the preset of its kind of place, its key from its seed, its row of the table, and its own `audio` field last
   function config(W) {
@@ -78,6 +79,9 @@ export function createAudio(opt = {}) {
     if ((d.weirdness ?? 0) > 0.8 && !custom.scale && !d.antechamber) c.scale = ((W.seed >>> 0) & 1) ? 'octatonic' : 'wholetone';
     for (const k of ['scale', 'bed', 'bright', 'root', 'bells']) if (custom[k] !== undefined) c[k] = custom[k];
     c.sc = SCALES[c.scale] || SCALES.pentatonic; c.hz = (semi) => C3 * Math.pow(2, (c.root + semi) / 12);
+    // what the score (score.js) reads: the kind of place, the seed, how light and warm the world looks, calm, strangeness, length
+    c.kind = d.antechamber ? 'between' : PRESET[d.category] ? d.category : PRESET[d.placeKind] ? d.placeKind : 'wilderness';
+    c.seed = W.seed >>> 0; c.light = d.tone ? d.tone[0] : 0.5; c.warm = d.tone ? d.tone[1] : 0; c.calm = !!d.calm; c.weird = d.weirdness ?? 0; c.duration = W.duration || 45;
     return c;
   }
   // the pad: five notes of the world's scale between 130 and 1050 Hz (the old one put its weight at 55 to 98 Hz, where small speakers
@@ -107,9 +111,15 @@ export function createAudio(opt = {}) {
     }, 3 + 8 * Math.random());
   }
   function build(c) {
-    const G = makeGroup(K);
-    if (!mute.has('pad')) pad(G, c);
-    if (!mute.has('bells') && c.bells > 0) bells(G, c);
+    const G = makeGroup(K), Wb = cur;   // this world's own flight, even while the next one is fading in
+    // the score in place of the held chord and the bells; the antechamber (which has a chord of its own) keeps the old pair, and so
+    // does createAudio({ classic: true })
+    if (!opt.classic && !c.chord) {
+      if (!mute.has('pad') && !mute.has('score')) { c.wave = wave; G.score = score(G, c, { progress: () => (opt.progress ? opt.progress(Wb) : null), paused: opt.paused, manual: opt.manual, lookahead: opt.lookahead, parts: opt.parts }); }
+    } else {
+      if (!mute.has('pad')) pad(G, c);
+      if (!mute.has('bells') && c.bells > 0) bells(G, c);
+    }
     if (!mute.has('bed') && BEDS[c.bed]) BEDS[c.bed](G, LEVEL.bed[c.bed] * dbToGain(c.gain), c);
     if (!mute.has('layers')) for (const [name, lv] of c.layers) LAYERS[name](G, LEVEL[name] * lv, c);
     return G;
@@ -131,12 +141,23 @@ export function createAudio(opt = {}) {
     // this world had running and puts the context to sleep
     toggle() {
       on = !on; const t = ac.currentTime; clearTimeout(offTimer);
-      master.gain.cancelScheduledValues(t); master.gain.setValueAtTime(master.gain.value, t); master.gain.linearRampToValueAtTime(on ? 1 : 0, t + (on ? 0.25 : 0.4));
-      if (on) { ac.resume(); if (!group) swap(); }
+      master.gain.cancelScheduledValues(t); master.gain.setValueAtTime(master.gain.value, t); master.gain.linearRampToValueAtTime(on && !held ? 1 : 0, t + (on ? 0.25 : 0.4));
+      if (on) { if (!held) ac.resume(); if (!group) swap(); }
       else offTimer = setTimeout(() => { if (on) return; if (group) group.dispose(); group = null; try { const p = ac.suspend(); if (p && p.catch) p.catch(() => {}); } catch (e) {} }, 600);
       return on;
     },
+    // the visuals paused (true) or playing again (false): the sound fades out in 0.4 s and its clock stops, and comes back where it left off
+    pause(p) {
+      held = !!p; K.held = held; clearTimeout(holdTimer); if (!on) return held;
+      const t = ac.currentTime; master.gain.cancelScheduledValues(t); master.gain.setValueAtTime(master.gain.value, t); master.gain.linearRampToValueAtTime(held ? 0 : 1, t + (held ? 0.4 : 0.25));
+      if (!held) ac.resume();
+      else holdTimer = setTimeout(() => { if (!held || !on) return; try { const q = ac.suspend(); if (q && q.catch) q.catch(() => {}); } catch (e) {} }, 500);
+      return held;
+    },
     // called at every world, and by the button with the world on screen (the antechamber too: its def.antechamber is true)
     world(W) { if (!W || !W.def || (W === cur && group)) return; cur = W; if (on) swap(); },
+    // for the test renderer, which runs with { manual: true } on an offline context: move the score's clock on to `now`
+    advance(now) { if (group && group.score) group.score.tick(now); },
+    context: ac,
   };
 }

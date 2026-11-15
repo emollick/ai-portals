@@ -60,9 +60,10 @@ export function makeGroup(K) {
     ctl(rate) { return G.noise('ctl', rate); },                                                  // the wandering value, at a speed
     mod(src, depth, param) { const g = G.gain(depth); src.connect(g); g.connect(param); return src; },   // lets it move a filter or a gain
     out(node, wet = 0) { node.connect(fade); if (wet) G.chain(node, G.gain(wet), fadeW); return node; },
-    // fn(t) again and again, lo to hi seconds apart, until the world leaves
+    // fn(t) again and again, lo to hi seconds apart, until the world leaves; skipped while the kit is held (K.held: the visuals are paused),
+    // so that nothing piles up at the stopped clock to sound all at once on the way back
     every(lo, hi, fn, first = lo + Math.random() * (hi - lo)) {
-      const go = (secs) => { const id = setTimeout(() => { timers.delete(id); if (dead) return; sweep(); fn(ac.currentTime + 0.06); go(lo + Math.random() * (hi - lo)); }, secs * 1000); timers.add(id); };
+      const go = (secs) => { const id = setTimeout(() => { timers.delete(id); if (dead) return; if (!K.held) { sweep(); fn(ac.currentTime + 0.06); } go(lo + Math.random() * (hi - lo)); }, secs * 1000); timers.add(id); };
       go(first);
     },
     // nodes of one short event (a chirp, a drip): they end by themselves at tEnd and are disconnected at the next event after that
