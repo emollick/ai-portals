@@ -236,7 +236,7 @@ async function boot() {
   if (fsOn) $('b-full').onclick = full; else $('b-full').style.display = 'none';   // an iPhone has no fullscreen: add the page to the home screen instead
   const bSound = $('b-sound');
   const sound = async () => {
-    if (!window.__audio) { try { const m = await import('./core/audio.js'); window.__audio = m.createAudio(); window.__audio.world(engine.cur); } catch (e) { console.warn('audio unavailable', e); return; } }
+    if (!window.__audio) { try { const m = await import('./core/audio.js'); window.__audio = m.createAudio({ progress: (W) => (W && engine.stats.id === W.def.id ? engine.stats.u : null), paused: () => engine.settings.paused }); window.__audio.world(engine.cur); } catch (e) { console.warn('audio unavailable', e); return; } }
     const on = window.__audio.toggle(); bSound.classList.toggle('on', on); bSound.setAttribute('aria-label', on ? 'Sound off' : 'Sound on');
   };
   bSound.onclick = sound;

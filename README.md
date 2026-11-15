@@ -82,7 +82,7 @@ tools          the build script and a small local server
 
 **Picking the next world.** Worlds you haven't seen come first, and for the first dozen worlds of a visit the picker keeps to the worlds the judging agents rated best. The Earthly to Strange slider sets how often the stranger worlds come up, and the picker leans toward a world unlike the one you're in: a different kind of place, lighter or darker, warmer or cooler.
 
-**Sound.** Each world gets a slow chord and a few bells. Most also get a quiet bed (wind, water, room tone, or a still hum in space) and up to three layers out of nineteen (rain, surf, birds, a distant bell), all synthesized by the browser's audio engine.
+**Sound.** Each world gets a short piece of music of its own (`src/core/score.js`): a pad that moves through a chord progression, a bass, a melody grown from the world's seed, and an arpeggio that comes in as the flight gets going, all in the world's key, with tempo and voice set by the kind of place, building towards each portal and greeting each new world with a strum. Most also get a quiet bed (wind, water, room tone, or a still hum in space) and up to three layers out of nineteen (rain, surf, birds, a distant bell), all synthesized by the browser's audio engine.
 
 **Graphics.** With graphics on Auto the site guesses a quality level from your graphics card, then raises and lowers the drawing resolution to keep the flight smooth.
 
